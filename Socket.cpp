@@ -204,14 +204,14 @@ SocketError TcpClientSocket::connect( const std::string & host, uint16_t port )
 {
 	if (_socket != INVALID_SOCK)
 	{
-		return SocketError::ALREADY_CONNECTED;
+		return SocketError::AlreadyConnected;
 	}
 
 	bool initialized = g_netSystem.initializeIfNotAlready();
 	if (!initialized)
 	{
 		_lastSystemError = getLastError();
-		return SocketError::NETWORKING_INIT_FAILED;
+		return SocketError::NetworkingInitFailed;
 	}
 
 	char portStr [8];
@@ -227,7 +227,7 @@ SocketError TcpClientSocket::connect( const std::string & host, uint16_t port )
 	if (getaddrinfo( host.c_str(), portStr, &hint, &ainfo ) != SUCCESS)
 	{
 		_lastSystemError = getLastError();
-		return SocketError::HOST_NOT_RESOLVED;
+		return SocketError::HostNotResolved;
 	}
 	auto ainfo_guard = at_scope_end_do( [ &ainfo ]() { freeaddrinfo( ainfo ); } );
 
@@ -236,7 +236,7 @@ SocketError TcpClientSocket::connect( const std::string & host, uint16_t port )
 	if (_socket == INVALID_SOCK)
 	{
 		_lastSystemError = getLastError();
-		return SocketError::OTHER;
+		return SocketError::Other;
 	}
 
 	if (::connect( _socket, ainfo->ai_addr, int( ainfo->ai_addrlen ) ) != SUCCESS)
@@ -244,37 +244,37 @@ SocketError TcpClientSocket::connect( const std::string & host, uint16_t port )
 		_lastSystemError = getLastError();
 		_closeSocket( _socket );
 		_socket = INVALID_SOCK;
-		return SocketError::CONNECT_FAILED;
+		return SocketError::ConnectFailed;
 	}
 
 	_lastSystemError = getLastError();
-	return SocketError::SUCCESS;
+	return SocketError::Success;
 }
 
 SocketError TcpClientSocket::disconnect()
 {
 	if (_socket == INVALID_SOCK)
 	{
-		return SocketError::NOT_CONNECTED;
+		return SocketError::NotConnected;
 	}
 
 	if (!_shutdownSocket( _socket ))
 	{
 		_lastSystemError = getLastError();
 		_socket = INVALID_SOCK;
-		return SocketError::OTHER;
+		return SocketError::Other;
 	}
 
 	if (!_closeSocket( _socket ))
 	{
 		_lastSystemError = getLastError();
 		_socket = INVALID_SOCK;
-		return SocketError::OTHER;
+		return SocketError::Other;
 	}
 
 	_lastSystemError = getLastError();
 	_socket = INVALID_SOCK;
-	return SocketError::SUCCESS;
+	return SocketError::Success;
 }
 
 bool TcpClientSocket::isConnected() const
@@ -298,7 +298,7 @@ SocketError TcpClientSocket::send( const uint8_t * buffer, size_t size )
 {
 	if (_socket == INVALID_SOCK)
 	{
-		return SocketError::NOT_CONNECTED;
+		return SocketError::NotConnected;
 	}
 
 	const uint8_t * sendBegin = buffer;
@@ -309,21 +309,21 @@ SocketError TcpClientSocket::send( const uint8_t * buffer, size_t size )
 		if (sent < 0)
 		{
 			_lastSystemError = getLastError();
-			return SocketError::SEND_FAILED;
+			return SocketError::SendFailed;
 		}
 		sendBegin += sent;
 		sendSize -= size_t( sent );
 	}
 
 	_lastSystemError = getLastError();
-	return SocketError::SUCCESS;
+	return SocketError::Success;
 }
 
 SocketError TcpClientSocket::receive( uint8_t * buffer, size_t & size )
 {
 	if (_socket == INVALID_SOCK)
 	{
-		return SocketError::NOT_CONNECTED;
+		return SocketError::NotConnected;
 	}
 
 	uint8_t * recvBegin = buffer;
@@ -340,19 +340,19 @@ SocketError TcpClientSocket::receive( uint8_t * buffer, size_t & size )
 			{
 				_closeSocket( _socket );  // server closed, so let's close on our side too
 				_socket = INVALID_SOCK;
-				return SocketError::CONNECTION_CLOSED;
+				return SocketError::ConnectionClosed;
 			}
 			else if (!_isBlocking && _isWouldBlock( _lastSystemError ))
 			{
-				return SocketError::WOULD_BLOCK;
+				return SocketError::WouldBlock;
 			}
 			else if (_isTimeout( _lastSystemError ))
 			{
-				return SocketError::TIMEOUT;
+				return SocketError::Timeout;
 			}
 			else
 			{
-				return SocketError::OTHER;
+				return SocketError::Other;
 			}
 		}
 		recvBegin += received;
@@ -360,7 +360,7 @@ SocketError TcpClientSocket::receive( uint8_t * buffer, size_t & size )
 	}
 
 	_lastSystemError = getLastError();
-	return SocketError::SUCCESS;
+	return SocketError::Success;
 }
 
 //======================================================================================================================
@@ -374,14 +374,14 @@ SocketError TcpServerSocket::open( uint16_t port )
 {
 	if (_socket != INVALID_SOCK)
 	{
-		return SocketError::ALREADY_OPENED;
+		return SocketError::AlreadyOpen;
 	}
 
 	bool initialized = g_netSystem.initializeIfNotAlready();
 	if (!initialized)
 	{
 		_lastSystemError = getLastError();
-		return SocketError::NETWORKING_INIT_FAILED;
+		return SocketError::NetworkingInitFailed;
 	}
 
 	// TODO: IPv4 vs IPv6
@@ -395,7 +395,7 @@ SocketError TcpServerSocket::open( uint16_t port )
 	if (_socket == INVALID_SOCK)
 	{
 		_lastSystemError = getLastError();
-		return SocketError::OTHER;
+		return SocketError::Other;
 	}
 
 	// bind the socket to a local port
@@ -404,7 +404,7 @@ SocketError TcpServerSocket::open( uint16_t port )
 		_lastSystemError = getLastError();
 		_closeSocket( _socket );
 		_socket = INVALID_SOCK;
-		return SocketError::BIND_FAILED;
+		return SocketError::BindFailed;
 	}
 
 	// set the socket to a listen state
@@ -414,37 +414,37 @@ SocketError TcpServerSocket::open( uint16_t port )
 		_lastSystemError = getLastError();
 		_closeSocket( _socket );
 		_socket = INVALID_SOCK;
-		return SocketError::LISTEN_FAILED;
+		return SocketError::ListenFailed;
 	}
 
 	_lastSystemError = getLastError();
-	return SocketError::SUCCESS;
+	return SocketError::Success;
 }
 
 SocketError TcpServerSocket::close()
 {
 	if (_socket == INVALID_SOCK)
 	{
-		return SocketError::NOT_CONNECTED;
+		return SocketError::NotConnected;
 	}
 
 	if (!_shutdownSocket( _socket ))
 	{
 		_lastSystemError = getLastError();
 		_socket = INVALID_SOCK;
-		return SocketError::OTHER;
+		return SocketError::Other;
 	}
 
 	if (!_closeSocket( _socket ))
 	{
 		_lastSystemError = getLastError();
 		_socket = INVALID_SOCK;
-		return SocketError::OTHER;
+		return SocketError::Other;
 	}
 
 	_lastSystemError = getLastError();
 	_socket = INVALID_SOCK;
-	return SocketError::SUCCESS;
+	return SocketError::Success;
 }
 
 TcpClientSocket TcpServerSocket::accept()

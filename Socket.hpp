@@ -33,26 +33,26 @@ namespace own {
 /** our own unified error codes, because error codes from system calls vary from OS to OS */
 enum class SocketError
 {
-	SUCCESS = 0,                   ///< The operation was successful.
+	Success = 0,                ///< The operation was successful.
 	// our own error states that don't have anything to do with the system sockets
-	ALREADY_CONNECTED = 1,         ///< Connect operation failed because the socket is already connected. Call disconnect() first.
-	NOT_CONNECTED = 2,             ///< Operation failed because the socket is not connected. Call connect(...) first.
+	AlreadyConnected = 1,       ///< Connect operation failed because the socket is already connected. Call disconnect() first.
+	NotConnected = 2,           ///< Operation failed because the socket is not connected. Call connect(...) first.
 	// errors related to connect attempt
-	NETWORKING_INIT_FAILED = 10,   ///< Operation failed because underlying networking system could not be initialized. Call getLastSystemError() for more info.
-	HOST_NOT_RESOLVED = 11,        ///< The hostname you entered could not be resolved to IP address. Call getLastSystemError() for more info.
-	CONNECT_FAILED = 12,           ///< Could not connect to the target server, either it's down or the port is closed. Call getLastSystemError() for more info.
+	NetworkingInitFailed = 10,  ///< Operation failed because underlying networking system could not be initialized. Call getLastSystemError() for more info.
+	HostNotResolved = 11,       ///< The hostname you entered could not be resolved to IP address. Call getLastSystemError() for more info.
+	ConnectFailed = 12,         ///< Could not connect to the target server, either it's down or the port is closed. Call getLastSystemError() for more info.
 	// errors related to send operation
-	SEND_FAILED = 20,              ///< Send operation failed. Call getLastSystemError() for more info.
+	SendFailed = 20,            ///< Send operation failed. Call getLastSystemError() for more info.
 	// errors related to receive operation
-	CONNECTION_CLOSED = 30,        ///< Server has closed the connection.
-	TIMEOUT = 31,                  ///< Operation timed-out.
-	WOULD_BLOCK = 32,              ///< Socket is set to non-blocking mode and there is no data in the system input buffer.
+	ConnectionClosed = 30,      ///< Server has closed the connection.
+	Timeout = 31,               ///< Operation timed-out.
+	WouldBlock = 32,            ///< Socket is set to non-blocking mode and there is no data in the system input buffer.
 	// errors related to opening a server
-	ALREADY_OPENED = 40,           ///< Opening server failed because the socket is already listening. Call close() first.
-	BIND_FAILED = 41,              ///< TODO
-	LISTEN_FAILED = 42,            ///< TODO
+	AlreadyOpen = 40,           ///< Opening server failed because the socket is already listening. Call close() first.
+	BindFailed = 41,            ///< TODO
+	ListenFailed = 42,          ///< TODO
 
-	OTHER = 255                    ///< Other system error. Call getLastSystemError() for more info.
+	Other = 255                 ///< Other system error. Call getLastSystemError() for more info.
 };
 
 #ifdef _WIN32
