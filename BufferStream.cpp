@@ -34,7 +34,7 @@ void BufferOutputStream::writeString0( const string & str )
 	//_buffer.resize( _buffer.size() + str.size() + 1 );
 
 	copy( str.begin(), str.end() + 1, _curPos );
-	_curPos += str.size();
+	_curPos += str.size() + 1;
 }
 
 bool BufferInputStream::readString( string & str, size_t size )
