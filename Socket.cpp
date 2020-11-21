@@ -21,13 +21,14 @@
 	constexpr system_error_t SUCCESS = ERROR_SUCCESS;
 #else
 	#include <unistd.h>        // open, close, read, write
+	#include <fcntl.h>         // fnctl, O_NONBLOCK
 	#include <sys/socket.h>    // socket
 	#include <netdb.h>         // getaddrinfo, gethostbyname
 	#include <netinet/in.h>    // sockaddr_in, in_addr, ntoh, hton
 	#include <arpa/inet.h>     // inet_addr, inet_ntoa
 
 	constexpr own::socket_t INVALID_SOCK = -1;
-	constexpr own::SystemError SUCCESS = 0;
+	constexpr system_error_t SUCCESS = 0;
 #endif // _WIN32
 
 #include <mutex>

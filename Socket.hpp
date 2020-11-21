@@ -22,6 +22,7 @@
 #include <chrono>  // timeout
 #include <vector>  // send, recv
 #include <array>
+#include <cstring> // strlen
 
 
 namespace own {
