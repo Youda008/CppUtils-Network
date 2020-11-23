@@ -125,18 +125,18 @@ _SocketCommon::_SocketCommon( socket_t sock )
 bool _SocketCommon::_shutdownSocket( socket_t sock )
 {
  #ifdef _WIN32
-	return ::shutdown( sock, SD_BOTH ) != 0;
+	return ::shutdown( sock, SD_BOTH ) == 0;
  #else
-	return ::shutdown( sock, SHUT_RDWR ) != 0;
+	return ::shutdown( sock, SHUT_RDWR ) == 0;
  #endif // _WIN32
 }
 
 bool _SocketCommon::_closeSocket( socket_t sock )
 {
  #ifdef _WIN32
-	return ::closesocket( sock ) != 0;
+	return ::closesocket( sock ) == 0;
  #else
-	return ::close( sock ) != 0;
+	return ::close( sock ) == 0;
  #endif // _WIN32
 }
 
