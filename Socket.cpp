@@ -198,7 +198,14 @@ TcpClientSocket::TcpClientSocket() : _SocketCommon() {}
 
 TcpClientSocket::~TcpClientSocket()
 {
-	disconnect();
+	if (_socket == INVALID_SOCK)
+	{
+		return;
+	}
+
+	_shutdownSocket( _socket );
+
+	_closeSocket( _socket );
 }
 
 SocketError TcpClientSocket::connect( const std::string & host, uint16_t port )
@@ -369,7 +376,17 @@ SocketError TcpClientSocket::receive( uint8_t * buffer, size_t & size )
 
 TcpServerSocket::TcpServerSocket() : _SocketCommon() {}
 
-TcpServerSocket::~TcpServerSocket() {}
+TcpServerSocket::~TcpServerSocket()
+{
+	if (_socket == INVALID_SOCK)
+	{
+		return;
+	}
+
+	_shutdownSocket( _socket );
+
+	_closeSocket( _socket );
+}
 
 SocketError TcpServerSocket::open( uint16_t port )
 {
