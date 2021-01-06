@@ -477,7 +477,8 @@ TcpClientSocket TcpServerSocket::accept()
 	socklen_t claddrSize = sizeof(clientAddr);
 
 	socket_t clientSocket = ::accept( _socket, (struct sockaddr *)&clientAddr, &claddrSize );
-	if (clientSocket == INVALID_SOCK) {
+	if (clientSocket == INVALID_SOCK)
+	{
 		_lastSystemError = getLastError();
 		return TcpClientSocket();
 	}
