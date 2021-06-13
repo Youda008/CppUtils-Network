@@ -18,7 +18,7 @@
 	using socklen_t = int;
 
 	constexpr own::socket_t INVALID_SOCK = INVALID_SOCKET;
-	constexpr system_error_t SUCCESS = ERROR_SUCCESS;
+	constexpr own::system_error_t SUCCESS = ERROR_SUCCESS;
 #else
 	#include <unistd.h>        // open, close, read, write
 	#include <fcntl.h>         // fnctl, O_NONBLOCK

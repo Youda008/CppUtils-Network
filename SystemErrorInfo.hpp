@@ -14,15 +14,14 @@
 #include <string>
 
 
+namespace own {
+
+
 #ifdef _WIN32
 	using system_error_t = uint32_t;  // should be DWORD but let's not include the whole windows.h just because of this
 #else
 	using system_error_t = int;
 #endif
-
-
-namespace own {
-
 
 /** OS-independent way to retrieve the error code of the last system call */
 system_error_t getLastError();
