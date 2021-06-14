@@ -14,10 +14,8 @@
 
 #include "LangUtils.hpp"
 
-#include <vector>
-#include <array>
 #include <string>
-#include <algorithm>  // copy
+#include <vector>
 
 
 namespace own {
@@ -26,7 +24,7 @@ namespace own {
 //======================================================================================================================
 /** binary buffer input stream allowing serialization via operator << */
 
-class BufferOutputStream
+class BinaryOutputStream
 {
 
  public:
@@ -34,44 +32,22 @@ class BufferOutputStream
 	/** WARNING: The class takes non-owning reference to a buffer stored somewhere else and doesn't remember anything
 	  * about its original type. You are responsible for making sure the buffer exists at least as long as this object
 	  * and for allocating the storage big enough for all write operations to fit in. */
-	BufferOutputStream( uint8_t * buffer, size_t size ) : _curPos( buffer ), _endPos( buffer + size ) {}
+	BinaryOutputStream( span< uint8_t > buffer ) : _curPos( buffer.begin() ), _endPos( buffer.end() ) {}
 
-	/** WARNING: The class takes non-owning reference to a buffer stored somewhere else and doesn't remember anything
-	  * about its original type. You are responsible for making sure the buffer exists at least as long as this object
-	  * and for allocating the storage big enough for all write operations to fit in. */
-	template< size_t size >
-	BufferOutputStream( uint8_t (& buffer) [size] ) : _curPos( std::begin(buffer) ), _endPos( std::end(buffer) ) {}
+	~BinaryOutputStream() {}
 
-	/** WARNING: The class takes non-owning reference to a buffer stored somewhere else and doesn't remember anything
-	  * about its original type. You are responsible for making sure the buffer exists at least as long as this object
-	  * and for allocating the storage big enough for all write operations to fit in. */
-	BufferOutputStream( std::vector< uint8_t > & buffer ) : _curPos( &*buffer.begin() ), _endPos( &*buffer.end() ) {}
-
-	/** WARNING: The class takes non-owning reference to a buffer stored somewhere else and doesn't remember anything
-	  * about its original type. You are responsible for making sure the buffer exists at least as long as this object
-	  * and for allocating the storage big enough for all write operations to fit in. */
-	template< size_t size >
-	BufferOutputStream( std::array< uint8_t, size > & buffer ) : _curPos( &*buffer.begin() ), _endPos( &*buffer.end() ) {}
-
-	~BufferOutputStream() {}
-
-	void reset( uint8_t * buffer, size_t size )         { _curPos = buffer; _endPos = buffer + size; }
-	template< size_t size >
-	void reset( uint8_t (& buffer) [size] )             { _curPos = std::begin(buffer); _endPos = std::end(buffer); }
-	void reset( std::vector< uint8_t > & buffer )       { _curPos = &*buffer.begin(); _endPos = &*buffer.end(); }
-	template< size_t size >
-	void reset( std::array< uint8_t, size > & buffer )  { _curPos = &*buffer.begin(); _endPos = &*buffer.end(); }
+	void reset( span< uint8_t > buffer )         { _curPos = buffer.begin(); _endPos = buffer.end(); }
 
 	//-- atomic elements -----------------------------------------------------------------------------------------------
 
-	BufferOutputStream & operator<<( uint8_t b )
+	BinaryOutputStream & operator<<( uint8_t b )
 	{
 		*_curPos = b;
 		_curPos++;
 		return *this;
 	}
 
-	BufferOutputStream & operator<<( char c )
+	BinaryOutputStream & operator<<( char c )
 	{
 		*_curPos = uint8_t(c);
 		_curPos++;
@@ -84,38 +60,34 @@ class BufferOutputStream
 	template< typename IntType, typename std::enable_if< std::is_integral<IntType>::value, int >::type = 0 >
 	void writeIntBE( IntType native )
 	{
-		//_buffer.resize( _buffer.size() + sizeof(IntType) );
+		uint8_t * const bigEndian = _curPos;
 
-		uint8_t * const bigEndianBegin = _curPos;
-		uint8_t * const bigEndianEnd = bigEndianBegin + sizeof(IntType);
-
-		uint8_t * pos = bigEndianEnd;
-		while (pos > bigEndianBegin) { // can't use traditional for-loop approach, because decrementing past begin
-			--pos;                     // is formally undefined and causes assertion in some standard lib implementations
-			*pos = uint8_t(native & 0xFF);
-			native = IntType(native >> 8);
+		// indexed variant is more optimizable than variant with pointers https://godbolt.org/z/McT3Yb
+		size_t pos = sizeof( native );
+		while (pos > 0) {  // can't use traditional for-loop approach, because index is unsigned
+			--pos;         // so we can't check if it's < 0
+			bigEndian[ pos ] = uint8_t( native & 0xFF );
+			native = IntType( native >> 8 );
 		}
 
-		_curPos += sizeof(IntType);
+		_curPos += sizeof( IntType );
 	}
 
 	/** Converts an arbitrary integral number from native format to little endian and writes it into the buffer. */
 	template< typename IntType, typename std::enable_if< std::is_integral<IntType>::value, int >::type = 0 >
 	void writeIntLE( IntType native )
 	{
-		//_buffer.resize( _buffer.size() + sizeof(IntType) );
+		uint8_t * const littleEndian = _curPos;
 
-		uint8_t * const littleEndianBegin = _curPos;
-		uint8_t * const littleEndianEnd = littleEndianBegin + sizeof(IntType);
-
-		uint8_t * pos = littleEndianBegin;
-		while (pos < littleEndianEnd) {
-			*pos = uint8_t(native & 0xFF);
-			native = IntType(native >> 8);
+		// indexed variant is more optimizable than variant with pointers https://godbolt.org/z/McT3Yb
+		size_t pos = 0;
+		while (pos < sizeof( IntType )) {
+			littleEndian[ pos ] = uint8_t( native & 0xFF );
+			native = IntType( native >> 8 );
 			++pos;
 		}
 
-		_curPos += sizeof(IntType);
+		_curPos += sizeof( IntType );
 	}
 
 	/** Converts an integer representation of an enum value from native format to big endian and writes it into the buffer. */
@@ -134,30 +106,39 @@ class BufferOutputStream
 
 	//-- strings and arrays --------------------------------------------------------------------------------------------
 
+	void writeBytes( span< const uint8_t > buffer );
+
 	/** Writes a string WITHOUT its null terminator to the buffer. */
-	void writeString( const std::string & str );
+	void writeString( const std::string & str )  { writeBytes( make_span( str ).cast< const uint8_t >() ); }
 
 	/** Writes a string WITH its null terminator to the buffer. */
 	void writeString0( const std::string & str );
 
+	BinaryOutputStream & operator<<( span< const uint8_t > buffer )
+	{
+		writeBytes( buffer );
+		return *this;
+	}
+
 	/** Writes a string and its null terminator to the buffer. */
-	BufferOutputStream & operator<<( const std::string & str )
+	BinaryOutputStream & operator<<( const std::string & str )
 	{
 		writeString0( str );
 		return *this;
 	}
 
-	// TODO: write arbitrary number of characters or bytes
+	/** Writes specified number of zero bytes to the buffer. */
+	void writeZeros( size_t numZeroBytes );
 
 	//-- error handling ------------------------------------------------------------------------------------------------
 
-	bool overflew() const { return _overflew; }
+	//bool hasFailed() const { return _failed; }
 
  private:
 
 	uint8_t * _curPos;  ///< current position in the buffer
 	uint8_t * _endPos;  ///< ending position in the buffer
-	bool _overflew = false;  ///< the end was reached while attemting to write into buffer
+	//bool _failed = false;  ///< the end was reached while attemting to write into buffer
 
 };
 
@@ -165,37 +146,18 @@ class BufferOutputStream
 //======================================================================================================================
 /** binary buffer input stream allowing deserialization via operator >> */
 
-class BufferInputStream
+class BinaryInputStream
 {
 
  public:
 
 	/** WARNING: The class takes non-owning reference to a buffer stored somewhere else and doesn't remember anything
 	  * about its original type. You are responsible for making sure the buffer exists at least as long as this object. */
-	BufferInputStream( const uint8_t * buffer, size_t size ) : _curPos( buffer ), _endPos( buffer + size ) {}
+	BinaryInputStream( span< const uint8_t > buffer ) : _curPos( buffer.data() ), _endPos( buffer.data() + buffer.size() ) {}
 
-	/** WARNING: The class takes non-owning reference to a buffer stored somewhere else and doesn't remember anything
-	  * about its original type. You are responsible for making sure the buffer exists at least as long as this object. */
-	template< size_t size >
-	BufferInputStream( const uint8_t (& buffer) [size] ) : _curPos( std::begin(buffer) ), _endPos( std::end(buffer) ) {}
+	~BinaryInputStream() {}
 
-	/** WARNING: The class takes non-owning reference to a buffer stored somewhere else and doesn't remember anything
-	  * about its original type. You are responsible for making sure the buffer exists at least as long as this object. */
-	BufferInputStream( const std::vector< uint8_t > & buffer ) : _curPos( &*buffer.begin() ), _endPos( &*buffer.end() ) {}
-
-	/** WARNING: The class takes non-owning reference to a buffer stored somewhere else and doesn't remember anything
-	  * about its original type. You are responsible for making sure the buffer exists at least as long as this object. */
-	template< size_t size >
-	BufferInputStream( const std::array< uint8_t, size > & buffer ) : _curPos( &*buffer.begin() ), _endPos( &*buffer.end() ) {}
-
-	~BufferInputStream() {}
-
-	void reset( const uint8_t * buffer, size_t size )        { _curPos = buffer; _endPos = buffer + size; }
-	template< size_t size >
-	void reset( const uint8_t (& buffer) [size] )            { _curPos = std::begin(buffer); _endPos = std::end(buffer); }
-	void reset( const std::vector< uint8_t > & buffer )      { _curPos = &*buffer.begin(); _endPos = &*buffer.end(); }
-	template< size_t size >
-	void reset( const std::array< uint8_t, size > & buffer ) { _curPos = &*buffer.begin(); _endPos = &*buffer.end(); }
+	void reset( span< const uint8_t > buffer )        { _curPos = buffer.data(); _endPos = buffer.data() + buffer.size(); }
 
 	//-- atomic elements -----------------------------------------------------------------------------------------------
 
@@ -213,13 +175,13 @@ class BufferInputStream
 		return char( get() );
 	}
 
-	BufferInputStream & operator>>( uint8_t & b )
+	BinaryInputStream & operator>>( uint8_t & b )
 	{
 		b = get();
 		return *this;
 	}
 
-	BufferInputStream & operator>>( char & b )
+	BinaryInputStream & operator>>( char & b )
 	{
 		b = getChar();
 		return *this;
@@ -234,20 +196,21 @@ class BufferInputStream
 	{
 		IntType native = 0;
 
-		if (canRead( sizeof(IntType) ))
-		{
-			const uint8_t * const bigEndianBegin = _curPos;
-			const uint8_t * const bigEndianEnd = bigEndianBegin + sizeof(IntType);
-
-			const uint8_t * pos = bigEndianBegin;
-			while (pos < bigEndianEnd) {
-				native = IntType(native << 8);
-				native = IntType(native | *pos);
-				++pos;
-			}
-
-			_curPos += sizeof(IntType);
+		if (!canRead( sizeof( IntType ) )) {
+			return native;
 		}
+
+		const uint8_t * const bigEndian = _curPos;
+
+		// indexed variant is more optimizable than variant with pointers https://godbolt.org/z/McT3Yb
+		size_t pos = 0;
+		while (pos < sizeof( IntType )) {
+			native = IntType( native << 8 );
+			native = IntType( native | bigEndian[ pos ] );
+			++pos;
+		}
+
+		_curPos += sizeof( IntType );
 
 		return native;
 	}
@@ -268,20 +231,21 @@ class BufferInputStream
 	{
 		IntType native = 0;
 
-		if (canRead( sizeof(IntType) ))
-		{
-			const uint8_t * const littleEndianBegin = _curPos;
-			const uint8_t * const littleEndianEnd = littleEndianBegin + sizeof(IntType);
-
-			const uint8_t * pos = littleEndianEnd;
-			while (pos > littleEndianBegin) { // can't use traditional for-loop approach, because decrementing past begin
-				--pos;                        // is formally undefined and causes assertion in some standard lib implementations
-				native = IntType(native << 8);
-				native = IntType(native | *pos);
-			}
-
-			_curPos += sizeof(IntType);
+		if (!canRead( sizeof( IntType ) )) {
+			return native;
 		}
+
+		const uint8_t * const littleEndian = _curPos;
+
+		// indexed variant is more optimizable than variant with pointers https://godbolt.org/z/McT3Yb
+		size_t pos = sizeof( IntType );
+		while (pos > 0) {  // can't use traditional for-loop approach, because index is unsigned
+			--pos;         // so we can't check if it's < 0
+			native = IntType( native << 8 );
+			native = IntType( native | littleEndian[ pos ] );
+		}
+
+		_curPos += sizeof(IntType);
 
 		return native;
 	}
@@ -331,6 +295,8 @@ class BufferInputStream
 
 	//-- strings and arrays --------------------------------------------------------------------------------------------
 
+	bool readBytes( span< uint8_t > buffer );
+
 	/** Reads a string of specified size from the buffer.
 	  * (output parameter variant) */
 	bool readString( std::string & str, size_t size );
@@ -357,14 +323,27 @@ class BufferInputStream
 		return str;
 	}
 
+	BinaryInputStream & operator>>( span< uint8_t > buffer )
+	{
+		readBytes( buffer );
+		return *this;
+	}
+
 	/** Reads a string from the buffer until a null terminator is found. */
-	BufferInputStream & operator>>( std::string & str )
+	BinaryInputStream & operator>>( std::string & str )
 	{
 		readString0( str );
 		return *this;
 	}
 
-	// TODO: read arbitrary number of characters or bytes
+	/** Reads the remaining data from the current position until the end of the buffer to a vector. */
+	bool readRemaining( std::vector< uint8_t > & buffer );
+
+	/** Reads the remaining data from the current position until the end of the buffer to a string. */
+	bool readRemaining( std::string & str );
+
+	/** Moves over specified number of bytes without returning them to the user. */
+	bool skip( size_t numBytes );
 
 	//-- error handling ------------------------------------------------------------------------------------------------
 
@@ -401,25 +380,25 @@ class BufferInputStream
 
 #define MAKE_LITTLE_ENDIAN_DEFAULT \
 	template< typename IntType, typename std::enable_if< std::is_integral<IntType>::value, int >::type = 0 > \
-	static own::BufferOutputStream & operator<<( own::BufferOutputStream & stream, IntType val ) \
+	static own::BinaryOutputStream & operator<<( own::BinaryOutputStream & stream, IntType val ) \
 	{\
 		stream.writeIntLE( val ); \
 		return stream; \
 	}\
 	template< typename EnumType, typename std::enable_if< std::is_enum<EnumType>::value, int >::type = 0 > \
-	static own::BufferOutputStream & operator<<( own::BufferOutputStream & stream, EnumType val ) \
+	static own::BinaryOutputStream & operator<<( own::BinaryOutputStream & stream, EnumType val ) \
 	{\
 		stream.writeEnumLE( val ); \
 		return stream; \
 	}\
 	template< typename IntType, typename std::enable_if< std::is_integral<IntType>::value, int >::type = 0 > \
-	static own::BufferInputStream & operator>>( own::BufferInputStream & stream, IntType & val ) \
+	static own::BinaryInputStream & operator>>( own::BinaryInputStream & stream, IntType & val ) \
 	{\
 		stream.readIntLE( val ); \
 		return stream; \
 	}\
 	template< typename EnumType, typename std::enable_if< std::is_enum<EnumType>::value, int >::type = 0 > \
-	static own::BufferInputStream & operator>>( own::BufferInputStream & stream, EnumType & val ) \
+	static own::BinaryInputStream & operator>>( own::BinaryInputStream & stream, EnumType & val ) \
 	{\
 		stream.readEnumLE( val ); \
 		return stream; \
@@ -427,25 +406,25 @@ class BufferInputStream
 
 #define MAKE_BIG_ENDIAN_DEFAULT \
 	template< typename IntType, typename std::enable_if< std::is_integral<IntType>::value, int >::type = 0 > \
-	static own::BufferOutputStream & operator<<( own::BufferOutputStream & stream, IntType val ) \
+	static own::BinaryOutputStream & operator<<( own::BinaryOutputStream & stream, IntType val ) \
 	{\
 		stream.writeIntBE( val ); \
 		return stream; \
 	}\
 	template< typename EnumType, typename std::enable_if< std::is_enum<EnumType>::value, int >::type = 0 > \
-	static own::BufferOutputStream & operator<<( own::BufferOutputStream & stream, EnumType val ) \
+	static own::BinaryOutputStream & operator<<( own::BinaryOutputStream & stream, EnumType val ) \
 	{\
 		stream.writeEnumBE( val ); \
 		return stream; \
 	}\
 	template< typename IntType, typename std::enable_if< std::is_integral<IntType>::value, int >::type = 0 > \
-	static own::BufferInputStream & operator>>( own::BufferInputStream & stream, IntType & val ) \
+	static own::BinaryInputStream & operator>>( own::BinaryInputStream & stream, IntType & val ) \
 	{\
 		stream.readIntBE( val ); \
 		return stream; \
 	}\
 	template< typename EnumType, typename std::enable_if< std::is_enum<EnumType>::value, int >::type = 0 > \
-	static own::BufferInputStream & operator>>( own::BufferInputStream & stream, EnumType & val ) \
+	static own::BinaryInputStream & operator>>( own::BinaryInputStream & stream, EnumType & val ) \
 	{\
 		stream.readEnumBE( val ); \
 		return stream; \
