@@ -384,25 +384,25 @@ class BinaryInputStream
 
 #define MAKE_LITTLE_ENDIAN_DEFAULT \
 	template< typename IntType, typename std::enable_if< std::is_integral<IntType>::value, int >::type = 0 > \
-	static own::BinaryOutputStream & operator<<( own::BinaryOutputStream & stream, IntType val ) \
+	inline own::BinaryOutputStream & operator<<( own::BinaryOutputStream & stream, IntType val ) \
 	{\
 		stream.writeIntLE( val ); \
 		return stream; \
 	}\
 	template< typename EnumType, typename std::enable_if< std::is_enum<EnumType>::value, int >::type = 0 > \
-	static own::BinaryOutputStream & operator<<( own::BinaryOutputStream & stream, EnumType val ) \
+	inline own::BinaryOutputStream & operator<<( own::BinaryOutputStream & stream, EnumType val ) \
 	{\
 		stream.writeEnumLE( val ); \
 		return stream; \
 	}\
 	template< typename IntType, typename std::enable_if< std::is_integral<IntType>::value, int >::type = 0 > \
-	static own::BinaryInputStream & operator>>( own::BinaryInputStream & stream, IntType & val ) \
+	inline own::BinaryInputStream & operator>>( own::BinaryInputStream & stream, IntType & val ) \
 	{\
 		stream.readIntLE( val ); \
 		return stream; \
 	}\
 	template< typename EnumType, typename std::enable_if< std::is_enum<EnumType>::value, int >::type = 0 > \
-	static own::BinaryInputStream & operator>>( own::BinaryInputStream & stream, EnumType & val ) \
+	inline own::BinaryInputStream & operator>>( own::BinaryInputStream & stream, EnumType & val ) \
 	{\
 		stream.readEnumLE( val ); \
 		return stream; \
@@ -410,25 +410,25 @@ class BinaryInputStream
 
 #define MAKE_BIG_ENDIAN_DEFAULT \
 	template< typename IntType, typename std::enable_if< std::is_integral<IntType>::value, int >::type = 0 > \
-	static own::BinaryOutputStream & operator<<( own::BinaryOutputStream & stream, IntType val ) \
+	inline own::BinaryOutputStream & operator<<( own::BinaryOutputStream & stream, IntType val ) \
 	{\
 		stream.writeIntBE( val ); \
 		return stream; \
 	}\
 	template< typename EnumType, typename std::enable_if< std::is_enum<EnumType>::value, int >::type = 0 > \
-	static own::BinaryOutputStream & operator<<( own::BinaryOutputStream & stream, EnumType val ) \
+	inline own::BinaryOutputStream & operator<<( own::BinaryOutputStream & stream, EnumType val ) \
 	{\
 		stream.writeEnumBE( val ); \
 		return stream; \
 	}\
 	template< typename IntType, typename std::enable_if< std::is_integral<IntType>::value, int >::type = 0 > \
-	static own::BinaryInputStream & operator>>( own::BinaryInputStream & stream, IntType & val ) \
+	inline own::BinaryInputStream & operator>>( own::BinaryInputStream & stream, IntType & val ) \
 	{\
 		stream.readIntBE( val ); \
 		return stream; \
 	}\
 	template< typename EnumType, typename std::enable_if< std::is_enum<EnumType>::value, int >::type = 0 > \
-	static own::BinaryInputStream & operator>>( own::BinaryInputStream & stream, EnumType & val ) \
+	inline own::BinaryInputStream & operator>>( own::BinaryInputStream & stream, EnumType & val ) \
 	{\
 		stream.readEnumBE( val ); \
 		return stream; \
