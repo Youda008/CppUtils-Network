@@ -72,13 +72,18 @@ class _SocketCommon
  public:
 
 	system_error_t getLastSystemError() const   { return _lastSystemError; }
-	bool setBlockingMode( bool enable )         { _isBlocking = enable; return _setBlockingMode( _socket, enable ); }
+	bool setBlockingMode( bool enable )         { _isBlocking = enable; return _setBlockingMode( _socket, enable ); }  // TODO
 	bool isBlocking() const                     { return _isBlocking; }
 
  protected:
 
 	_SocketCommon();
 	_SocketCommon( socket_t sock );
+	~_SocketCommon();
+
+	_SocketCommon( const _SocketCommon & other ) = delete;
+	_SocketCommon( _SocketCommon && other );
+	_SocketCommon & operator=( _SocketCommon && other );
 
 	static bool _shutdownSocket( socket_t sock );
 	static bool _closeSocket( socket_t sock );
@@ -106,6 +111,10 @@ class TcpClientSocket : public _SocketCommon
 
 	TcpClientSocket();
 	~TcpClientSocket();
+
+	TcpClientSocket( const TcpClientSocket & other ) = delete;
+	TcpClientSocket( TcpClientSocket && other );
+	TcpClientSocket & operator=( TcpClientSocket && other );
 
 	SocketError connect( const std::string & host, uint16_t port );
 	SocketError disconnect();
@@ -163,6 +172,10 @@ class TcpServerSocket : public _SocketCommon
 
 	TcpServerSocket();
 	~TcpServerSocket();
+
+	TcpServerSocket( const TcpServerSocket & other ) = delete;
+	TcpServerSocket( TcpServerSocket && other );
+	TcpServerSocket & operator=( TcpServerSocket && other );
 
 	/** Opens a TCP server on selected port. */
 	SocketError open( uint16_t port );

@@ -122,6 +122,35 @@ _SocketCommon::_SocketCommon( socket_t sock )
 	_isBlocking( true )
 {}
 
+_SocketCommon::~_SocketCommon()
+{
+	if (_socket == INVALID_SOCK)
+	{
+		return;
+	}
+
+	_shutdownSocket( _socket );
+
+	_closeSocket( _socket );
+}
+
+_SocketCommon::_SocketCommon( _SocketCommon && other )
+{
+	*this = move( other );
+}
+
+_SocketCommon & _SocketCommon::operator=( _SocketCommon && other )
+{
+	_socket = other._socket;
+	_lastSystemError = other._lastSystemError;
+	_isBlocking = other._isBlocking;
+	other._socket = INVALID_SOCK;
+	other._lastSystemError = 0;
+	other._isBlocking = false;
+
+	return *this;
+}
+
 bool _SocketCommon::_shutdownSocket( socket_t sock )
 {
  #ifdef _WIN32
@@ -196,16 +225,16 @@ bool _SocketCommon::_setBlockingMode( socket_t sock, bool enable )
 
 TcpClientSocket::TcpClientSocket() : _SocketCommon() {}
 
-TcpClientSocket::~TcpClientSocket()
+TcpClientSocket::~TcpClientSocket() {}  // delegate to _SocketCommon
+
+TcpClientSocket::TcpClientSocket( TcpClientSocket && other )
 {
-	if (_socket == INVALID_SOCK)
-	{
-		return;
-	}
+	*this = move( other );
+}
 
-	_shutdownSocket( _socket );
-
-	_closeSocket( _socket );
+TcpClientSocket & TcpClientSocket::operator=( TcpClientSocket && other )
+{
+	return static_cast< TcpClientSocket & >( _SocketCommon::operator=( move( other ) ) );
 }
 
 SocketError TcpClientSocket::connect( const std::string & host, uint16_t port )
@@ -376,16 +405,16 @@ SocketError TcpClientSocket::receive( uint8_t * buffer, size_t & size )
 
 TcpServerSocket::TcpServerSocket() : _SocketCommon() {}
 
-TcpServerSocket::~TcpServerSocket()
+TcpServerSocket::~TcpServerSocket() {}  // delegate to _SocketCommon
+
+TcpServerSocket::TcpServerSocket( TcpServerSocket && other )
 {
-	if (_socket == INVALID_SOCK)
-	{
-		return;
-	}
+	*this = move( other );
+}
 
-	_shutdownSocket( _socket );
-
-	_closeSocket( _socket );
+TcpServerSocket & TcpServerSocket::operator=( TcpServerSocket && other )
+{
+	return static_cast< TcpServerSocket & >( _SocketCommon::operator=( move( other ) ) );
 }
 
 SocketError TcpServerSocket::open( uint16_t port )

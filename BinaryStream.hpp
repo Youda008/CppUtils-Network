@@ -34,7 +34,9 @@ class BinaryOutputStream
 	  * and for allocating the storage big enough for all write operations to fit in. */
 	BinaryOutputStream( span< uint8_t > buffer ) : _curPos( buffer.begin() ), _endPos( buffer.end() ) {}
 
-	~BinaryOutputStream() {}
+	BinaryOutputStream( const BinaryOutputStream & other ) = delete;
+	BinaryOutputStream( BinaryOutputStream && other ) = delete;
+	BinaryOutputStream & operator=( const BinaryOutputStream & other ) = delete;
 
 	void reset( span< uint8_t > buffer )         { _curPos = buffer.begin(); _endPos = buffer.end(); }
 
@@ -155,9 +157,11 @@ class BinaryInputStream
 	  * about its original type. You are responsible for making sure the buffer exists at least as long as this object. */
 	BinaryInputStream( span< const uint8_t > buffer ) : _curPos( buffer.data() ), _endPos( buffer.data() + buffer.size() ) {}
 
-	~BinaryInputStream() {}
+	BinaryInputStream( const BinaryInputStream & other ) = delete;
+	BinaryInputStream( BinaryInputStream && other ) = delete;
+	BinaryInputStream & operator=( const BinaryInputStream & other ) = delete;
 
-	void reset( span< const uint8_t > buffer )        { _curPos = buffer.data(); _endPos = buffer.data() + buffer.size(); }
+	void reset( span< const uint8_t > buffer )     { _curPos = buffer.data(); _endPos = buffer.data() + buffer.size(); }
 
 	//-- atomic elements -----------------------------------------------------------------------------------------------
 
