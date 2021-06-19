@@ -71,6 +71,9 @@ class _SocketCommon
 
  public:
 
+	SocketError close();
+	bool isOpen() const;
+
 	system_error_t getLastSystemError() const   { return _lastSystemError; }
 	bool setBlockingMode( bool enable )         { _isBlocking = enable; return _setBlockingMode( _socket, enable ); }  // TODO
 	bool isBlocking() const                     { return _isBlocking; }
@@ -180,8 +183,6 @@ class TcpServerSocket : public _SocketCommon
 	/** Opens a TCP server on selected port. */
 	SocketError open( uint16_t port );
 
-	SocketError close();
-
 	TcpClientSocket accept();
 
 };
@@ -198,7 +199,9 @@ class UdpSocket : public _SocketCommon
 	UdpSocket();
 	~UdpSocket();
 
-	// TODO
+	UdpSocket( const UdpSocket & other ) = delete;
+	UdpSocket( UdpSocket && other );
+	UdpSocket & operator=( UdpSocket && other );
 
 };
 

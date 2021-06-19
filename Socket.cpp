@@ -151,6 +151,37 @@ _SocketCommon & _SocketCommon::operator=( _SocketCommon && other )
 	return *this;
 }
 
+SocketError _SocketCommon::close()
+{
+	if (_socket == INVALID_SOCK)
+	{
+		return SocketError::NotConnected;
+	}
+
+	if (!_shutdownSocket( _socket ))
+	{
+		_lastSystemError = getLastError();
+		_socket = INVALID_SOCK;
+		return SocketError::Other;
+	}
+
+	if (!_closeSocket( _socket ))
+	{
+		_lastSystemError = getLastError();
+		_socket = INVALID_SOCK;
+		return SocketError::Other;
+	}
+
+	_lastSystemError = getLastError();
+	_socket = INVALID_SOCK;
+	return SocketError::Success;
+}
+
+bool _SocketCommon::isOpen() const
+{
+	return _socket != INVALID_SOCK;
+}
+
 bool _SocketCommon::_shutdownSocket( socket_t sock )
 {
  #ifdef _WIN32
@@ -290,33 +321,12 @@ SocketError TcpClientSocket::connect( const std::string & host, uint16_t port )
 
 SocketError TcpClientSocket::disconnect()
 {
-	if (_socket == INVALID_SOCK)
-	{
-		return SocketError::NotConnected;
-	}
-
-	if (!_shutdownSocket( _socket ))
-	{
-		_lastSystemError = getLastError();
-		_socket = INVALID_SOCK;
-		return SocketError::Other;
-	}
-
-	if (!_closeSocket( _socket ))
-	{
-		_lastSystemError = getLastError();
-		_socket = INVALID_SOCK;
-		return SocketError::Other;
-	}
-
-	_lastSystemError = getLastError();
-	_socket = INVALID_SOCK;
-	return SocketError::Success;
+	return _SocketCommon::close();
 }
 
 bool TcpClientSocket::isConnected() const
 {
-	return _socket != INVALID_SOCK;
+	return _SocketCommon::isOpen();
 }
 
 bool TcpClientSocket::isValid() const
@@ -468,32 +478,6 @@ SocketError TcpServerSocket::open( uint16_t port )
 	return SocketError::Success;
 }
 
-SocketError TcpServerSocket::close()
-{
-	if (_socket == INVALID_SOCK)
-	{
-		return SocketError::NotConnected;
-	}
-
-	if (!_shutdownSocket( _socket ))
-	{
-		_lastSystemError = getLastError();
-		_socket = INVALID_SOCK;
-		return SocketError::Other;
-	}
-
-	if (!_closeSocket( _socket ))
-	{
-		_lastSystemError = getLastError();
-		_socket = INVALID_SOCK;
-		return SocketError::Other;
-	}
-
-	_lastSystemError = getLastError();
-	_socket = INVALID_SOCK;
-	return SocketError::Success;
-}
-
 TcpClientSocket TcpServerSocket::accept()
 {
 	if (_socket == INVALID_SOCK)
@@ -521,6 +505,18 @@ TcpClientSocket TcpServerSocket::accept()
 //  UdpSocket
 
 UdpSocket::UdpSocket() : _SocketCommon() {}
+
+UdpSocket::~UdpSocket() {}  // delegate to _SocketCommon
+
+UdpSocket::UdpSocket( UdpSocket && other )
+{
+	*this = move( other );
+}
+
+UdpSocket & UdpSocket::operator=( UdpSocket && other )
+{
+	return static_cast< UdpSocket & >( _SocketCommon::operator=( move( other ) ) );
+}
 
 
 //======================================================================================================================
