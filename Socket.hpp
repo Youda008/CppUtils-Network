@@ -137,7 +137,11 @@ class TcpClientSocket : public impl::SocketCommon
 	/** TODO */
 	SocketError send( const std::string & strMessage )
 	{
-		return send( span< const char >( strMessage ).cast<const uint8_t>() );
+		return send( span< const char >( strMessage ).cast< const uint8_t >() );
+	}
+	SocketError send( const char * strMessage )
+	{
+		return send( std::string( strMessage ) );
 	}
 
 	/** Receive the given number of bytes from the socket. If the requested amount of data don't arrive all at once,
@@ -216,7 +220,7 @@ class UdpSocket : public impl::SocketCommon
 
 	SocketError sendTo( const IPAddr & addr, uint16_t port, const std::string & strMessage )
 	{
-		return sendTo( addr, port, span< const char >( strMessage ).cast<const uint8_t>() );
+		return sendTo( addr, port, span< const char >( strMessage ).cast< const uint8_t >() );
 	}
 	SocketError sendTo( const IPAddr & addr, uint16_t port, const char * strMessage )
 	{
