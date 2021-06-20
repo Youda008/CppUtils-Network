@@ -10,18 +10,15 @@
 
 
 #include "SystemErrorInfo.hpp"
-
-#ifdef _WIN32
-	#define WIN32_LEAN_AND_MEAN
-	#include <winsock2.h>
-#else
-	#include <sys/socket.h>
-#endif // _WIN32
+#include "NetAddress.hpp"
+#include "Span.hpp"
 
 #include <chrono>  // timeout
 #include <vector>  // send, recv
 #include <array>
 #include <cstring> // strlen
+
+struct sockaddr;
 
 
 namespace own {
@@ -56,16 +53,19 @@ enum class SocketError
 };
 
 #ifdef _WIN32
-	using socket_t = SOCKET;
+	using socket_t = uintptr_t;  // should be SOCKET but let's not include the whole big winsock2.h just because of this
 #else
 	using socket_t = int;
 #endif
 
 
 //======================================================================================================================
-/** common for all socket classes */
+///  private implementation details
 
-class _SocketCommon
+namespace impl {
+
+/** common for all socket classes */
+class SocketCommon
 {
 
  public:
@@ -79,13 +79,13 @@ class _SocketCommon
 
  protected:
 
-	_SocketCommon();
-	_SocketCommon( socket_t sock );
-	~_SocketCommon();
+	SocketCommon();
+	SocketCommon( socket_t sock );
+	~SocketCommon();
 
-	_SocketCommon( const _SocketCommon & other ) = delete;
-	_SocketCommon( _SocketCommon && other );
-	_SocketCommon & operator=( _SocketCommon && other );
+	SocketCommon( const SocketCommon & other ) = delete;
+	SocketCommon( SocketCommon && other );
+	SocketCommon & operator=( SocketCommon && other );
 
 	static bool _shutdownSocket( socket_t sock );
 	static bool _closeSocket( socket_t sock );
@@ -102,11 +102,13 @@ class _SocketCommon
 
 };
 
+} // namespace impl
+
 
 //======================================================================================================================
 /** abstraction over low-level TCP socket system calls */
 
-class TcpClientSocket : public _SocketCommon
+class TcpClientSocket : public impl::SocketCommon
 {
 
  public:
@@ -119,6 +121,7 @@ class TcpClientSocket : public _SocketCommon
 	TcpClientSocket & operator=( TcpClientSocket && other );
 
 	SocketError connect( const std::string & host, uint16_t port );
+	SocketError connect( const IPAddr & addr, uint16_t port );
 	SocketError disconnect();
 	bool isConnected() const;
 
@@ -129,37 +132,40 @@ class TcpClientSocket : public _SocketCommon
 
 	/** Sends given number of bytes to the socket. If the system does not accept that amount of data all at once,
 	  * it repeats the system calls until all requested data are sent. */
-	SocketError send( const uint8_t * buffer, size_t size );
+	SocketError send( span< const uint8_t > buffer );
 
-	SocketError send( const std::vector< uint8_t > & buffer )       { return send( buffer.data(), buffer.size() ); }
-	template< size_t size >
-	SocketError send( const std::array< uint8_t, size > & buffer )  { return send( buffer.data(), buffer.size() ); }
-	SocketError send( const char * strMessage )                     { return send( (const uint8_t *)strMessage, strlen( strMessage ) ); }
+	/** TODO */
+	SocketError send( const std::string & strMessage )
+	{
+		return send( span< const char >( strMessage ).cast<const uint8_t>() );
+	}
 
 	/** Receive the given number of bytes from the socket. If the requested amount of data don't arrive all at once,
 	  * it repeats the system calls until all requested data are received.
-	  * @param[in, out] size - it needs to be set to desired size before call,
-	  *                        and will contain actual received size after the call */
-	SocketError receive( uint8_t * buffer, size_t & size );
+	  * The number of bytes actually received is stored in an output parameter.
+	  * @param[out] received - how many bytes were really received */
+	SocketError receive( span< uint8_t > buffer, size_t & received );
+
+	/** Receive the given number of bytes from the socket. If the requested amount of data don't arrive all at once,
+	  * it repeats the system calls until all requested data are received.
+	  * After the call, the size of the vector will be equal to the number of bytes actually received.
+	  * @param[in] size - how many bytes to receive */
 	SocketError receive( std::vector< uint8_t > & buffer, size_t size )
 	{
 		buffer.resize( size );  // allocate the needed storage
-		SocketError result = receive( buffer.data(), size );
-		buffer.resize( size );  // let's return the user a vector only as big as how much we actually received
+		size_t received;
+		SocketError result = receive( span< uint8_t >( buffer ), received );
+		buffer.resize( received );  // let's return the user a vector only as big as how much we actually received
 		return result;
-	}
-	template< size_t size >
-	SocketError receive( std::array< uint8_t, size > & buffer, size_t & received )
-	{
-		received = buffer.size();
-		return receive( buffer.data(), received );
 	}
 
  protected:
 
 	 // allow creating socket object from already initialized socket handle, but only for TcpServerSocket
 	 friend class TcpServerSocket;
-	 TcpClientSocket( socket_t sock ) : _SocketCommon( sock ) {}
+	 TcpClientSocket( socket_t sock ) : SocketCommon( sock ) {}
+
+	 SocketError _connect( int family, int addrlen, struct sockaddr * addr );
 
 };
 
@@ -167,7 +173,7 @@ class TcpClientSocket : public _SocketCommon
 //======================================================================================================================
 /** abstraction over low-level TCP socket system calls */
 
-class TcpServerSocket : public _SocketCommon
+class TcpServerSocket : public impl::SocketCommon
 {
 
  public:
@@ -190,7 +196,7 @@ class TcpServerSocket : public _SocketCommon
 //======================================================================================================================
 /** abstraction over low-level UDP socket system calls */
 
-class UdpSocket : public _SocketCommon
+class UdpSocket : public impl::SocketCommon
 {
 
  public:
@@ -201,6 +207,24 @@ class UdpSocket : public _SocketCommon
 	UdpSocket( const UdpSocket & other ) = delete;
 	UdpSocket( UdpSocket && other );
 	UdpSocket & operator=( UdpSocket && other );
+
+	/** Opens an UDP socket on selected port. */
+	SocketError open( uint16_t port );
+
+	/** TODO */
+	SocketError sendTo( const IPAddr & addr, uint16_t port, span< const uint8_t > buffer );
+
+	SocketError sendTo( const IPAddr & addr, uint16_t port, const std::string & strMessage )
+	{
+		return sendTo( addr, port, span< const char >( strMessage ).cast<const uint8_t>() );
+	}
+	SocketError sendTo( const IPAddr & addr, uint16_t port, const char * strMessage )
+	{
+		return sendTo( addr, port, std::string( strMessage ) );
+	}
+
+	/** TODO */
+	SocketError recvFrom( IPAddr & addr, uint16_t & port, span< uint8_t > buffer, size_t & received );
 
 };
 

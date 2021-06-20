@@ -5,13 +5,14 @@
 // Description: classes for binary serialization into binary buffers via operators << and >>
 //======================================================================================================================
 
-#ifndef CPPUTILS_BUFFER_STREAM_INCLUDED
-#define CPPUTILS_BUFFER_STREAM_INCLUDED
+#ifndef CPPUTILS_BINARY_STREAM_INCLUDED
+#define CPPUTILS_BINARY_STREAM_INCLUDED
 
 
 #include "Essential.hpp"
 
-#include "LangUtils.hpp"
+#include "Span.hpp"
+#include "LangUtils.hpp"  // enumToInt
 
 #include <string>
 #include <vector>
@@ -110,7 +111,7 @@ class BinaryOutputStream
 	void writeBytes( span< const uint8_t > buffer );
 
 	/** Writes a string WITHOUT its null terminator to the buffer. */
-	void writeString( const std::string & str )  { writeBytes( make_span( str ).cast< const uint8_t >() ); }
+	void writeString( const std::string & str )  { writeBytes( span< const char >( str ).cast< const uint8_t >() ); }
 
 	/** Writes a string WITH its null terminator to the buffer. */
 	void writeString0( const std::string & str );
@@ -437,4 +438,4 @@ class BinaryInputStream
 //======================================================================================================================
 
 
-#endif // CPPUTILS_BUFFER_STREAM_INCLUDED
+#endif // CPPUTILS_BINARY_STREAM_INCLUDED

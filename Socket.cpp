@@ -37,15 +37,66 @@ namespace own {
 
 
 //======================================================================================================================
+//  address utils
+
+static void endpointToSockaddr( const IPAddr & ip, uint16_t port, struct sockaddr_storage * saddr, int & addrlen )
+{
+	memset( saddr, 0, sizeof(*saddr) );
+	if (ip.version() == IPAddr::Ver::_4)
+	{
+		auto saddr4 = reinterpret_cast< struct sockaddr_in * >( saddr );
+		saddr4->sin_family = AF_INET;
+		memcpy( &saddr4->sin_addr, ip.data().data(), sizeof(saddr4->sin_addr) );
+		saddr4->sin_port = htons( port );
+		addrlen = sizeof(sockaddr_in);
+	}
+	else if (ip.version() == IPAddr::Ver::_6)
+	{
+		auto saddr6 = reinterpret_cast< struct sockaddr_in6 * >( saddr );
+		saddr6->sin6_family = AF_INET6;
+		memcpy( &saddr6->sin6_addr, ip.data().data(), sizeof(saddr6->sin6_addr) );
+		saddr6->sin6_port = htons( port );
+		addrlen = sizeof(sockaddr_in6);
+	}
+	else
+	{
+		throw std::invalid_argument("attempted socket operation with uninitialized IPAddr");
+	}
+}
+
+static void sockaddrToEndpoint( const struct sockaddr_storage * saddr, IPAddr & ip, uint16_t & port )
+{
+	if (saddr->ss_family == AF_INET)
+	{
+		auto saddr4 = reinterpret_cast< const struct sockaddr_in * >( saddr );
+		ip = IPAddr( span< uint8_t >( (uint8_t *)&saddr4->sin_addr, sizeof(saddr4->sin_addr) ) );
+		port = ntohs( saddr4->sin_port );
+	}
+	else if (saddr->ss_family == AF_INET6)
+	{
+		auto saddr6 = reinterpret_cast< const struct sockaddr_in6 * >( saddr );
+		ip = IPAddr( span< uint8_t >( (uint8_t *)&saddr6->sin6_addr, sizeof(saddr6->sin6_addr) ) );
+		port = ntohs( saddr6->sin6_port );
+	}
+	else
+	{
+		// TODO: return value
+		throw std::invalid_argument("socket operation returned unexpected address family");
+	}
+}
+
+
+//======================================================================================================================
 //  network subsystem initialization and automatic termination
 
-/** private class for internal use */
-class _NetworkingSubsystem
+/// Represents OS-dependent networking subsystem.
+/** This is a private class for internal use. */
+class NetworkingSubsystem
 {
 
  public:
 
-	_NetworkingSubsystem() : _initialized( false ) {}
+	NetworkingSubsystem() : _initialized( false ) {}
 
 	bool initializeIfNotAlready()
 	{
@@ -62,7 +113,7 @@ class _NetworkingSubsystem
 		return _initialized;
 	}
 
-	~_NetworkingSubsystem()
+	~NetworkingSubsystem()
 	{
 		if (_initialized)
 		{
@@ -101,27 +152,29 @@ class _NetworkingSubsystem
 
 };
 
-static _NetworkingSubsystem g_netSystem;  // this will get initialized on first use and terminated on process exit
+static NetworkingSubsystem g_netSystem;  // this will get initialized on first use and terminated on process exit
 
 
 //======================================================================================================================
 //  SocketCommon
 
-_SocketCommon::_SocketCommon()
+namespace impl {
+
+SocketCommon::SocketCommon()
 :
 	_socket( INVALID_SOCK ),
 	_lastSystemError( SUCCESS ),
 	_isBlocking( true )
 {}
 
-_SocketCommon::_SocketCommon( socket_t sock )
+SocketCommon::SocketCommon( socket_t sock )
 :
 	_socket( sock ),
 	_lastSystemError( SUCCESS ),
 	_isBlocking( true )
 {}
 
-_SocketCommon::~_SocketCommon()
+SocketCommon::~SocketCommon()
 {
 	if (_socket == INVALID_SOCK)
 	{
@@ -133,12 +186,12 @@ _SocketCommon::~_SocketCommon()
 	_closeSocket( _socket );
 }
 
-_SocketCommon::_SocketCommon( _SocketCommon && other )
+SocketCommon::SocketCommon( SocketCommon && other )
 {
 	*this = move( other );
 }
 
-_SocketCommon & _SocketCommon::operator=( _SocketCommon && other )
+SocketCommon & SocketCommon::operator=( SocketCommon && other )
 {
 	_socket = other._socket;
 	_lastSystemError = other._lastSystemError;
@@ -150,7 +203,7 @@ _SocketCommon & _SocketCommon::operator=( _SocketCommon && other )
 	return *this;
 }
 
-SocketError _SocketCommon::close()
+SocketError SocketCommon::close()
 {
 	if (_socket == INVALID_SOCK)
 	{
@@ -176,12 +229,12 @@ SocketError _SocketCommon::close()
 	return SocketError::Success;
 }
 
-bool _SocketCommon::isOpen() const
+bool SocketCommon::isOpen() const
 {
 	return _socket != INVALID_SOCK;
 }
 
-bool _SocketCommon::_shutdownSocket( socket_t sock )
+bool SocketCommon::_shutdownSocket( socket_t sock )
 {
  #ifdef _WIN32
 	return ::shutdown( sock, SD_BOTH ) == 0;
@@ -190,7 +243,7 @@ bool _SocketCommon::_shutdownSocket( socket_t sock )
  #endif // _WIN32
 }
 
-bool _SocketCommon::_closeSocket( socket_t sock )
+bool SocketCommon::_closeSocket( socket_t sock )
 {
  #ifdef _WIN32
 	return ::closesocket( sock ) == 0;
@@ -199,7 +252,7 @@ bool _SocketCommon::_closeSocket( socket_t sock )
  #endif // _WIN32
 }
 
-bool _SocketCommon::_setTimeout( socket_t sock, std::chrono::milliseconds timeout_ms )
+bool SocketCommon::_setTimeout( socket_t sock, std::chrono::milliseconds timeout_ms )
 {
  #ifdef _WIN32
 	DWORD timeout = (DWORD)timeout_ms.count();
@@ -209,10 +262,10 @@ bool _SocketCommon::_setTimeout( socket_t sock, std::chrono::milliseconds timeou
 	timeout.tv_usec = (timeout_ms.count() % 1000) * 1000;
  #endif // _WIN32
 
-	return setsockopt( sock, SOL_SOCKET, SO_RCVTIMEO, (char *)&timeout, sizeof(timeout) ) == 0;
+	return ::setsockopt( sock, SOL_SOCKET, SO_RCVTIMEO, (char *)&timeout, sizeof(timeout) ) == 0;
 }
 
-bool _SocketCommon::_isTimeout( system_error_t errorCode )
+bool SocketCommon::_isTimeout( system_error_t errorCode )
 {
  #ifdef _WIN32
 	return errorCode == WSAETIMEDOUT;
@@ -221,7 +274,7 @@ bool _SocketCommon::_isTimeout( system_error_t errorCode )
  #endif // _WIN32
 }
 
-bool _SocketCommon::_isWouldBlock( system_error_t errorCode )
+bool SocketCommon::_isWouldBlock( system_error_t errorCode )
 {
  #ifdef _WIN32
 	return errorCode == WSAEWOULDBLOCK;
@@ -230,13 +283,13 @@ bool _SocketCommon::_isWouldBlock( system_error_t errorCode )
  #endif // _WIN32
 }
 
-bool _SocketCommon::_setBlockingMode( socket_t sock, bool enable )
+bool SocketCommon::_setBlockingMode( socket_t sock, bool enable )
 {
 #ifdef _WIN32
 	unsigned long mode = enable ? 0 : 1;
-	return ioctlsocket( sock, (long)FIONBIO, &mode ) == 0;
+	return ::ioctlsocket( sock, (long)FIONBIO, &mode ) == 0;
 #else
-	int flags = fcntl( sock, F_GETFL, 0 );
+	int flags = ::fcntl( sock, F_GETFL, 0 );
 	if (flags == -1)
 		return false;
 
@@ -245,17 +298,19 @@ bool _SocketCommon::_setBlockingMode( socket_t sock, bool enable )
 	else
 		flags |= O_NONBLOCK;
 
-	return fcntl( sock, F_SETFL, flags ) == 0;
+	return ::fcntl( sock, F_SETFL, flags ) == 0;
 #endif
 }
+
+} // namespace impl
 
 
 //======================================================================================================================
 //  TcpSocket
 
-TcpClientSocket::TcpClientSocket() : _SocketCommon() {}
+TcpClientSocket::TcpClientSocket() : impl::SocketCommon() {}
 
-TcpClientSocket::~TcpClientSocket() {}  // delegate to _SocketCommon
+TcpClientSocket::~TcpClientSocket() {}  // delegate to SocketCommon
 
 TcpClientSocket::TcpClientSocket( TcpClientSocket && other )
 {
@@ -264,7 +319,7 @@ TcpClientSocket::TcpClientSocket( TcpClientSocket && other )
 
 TcpClientSocket & TcpClientSocket::operator=( TcpClientSocket && other )
 {
-	return static_cast< TcpClientSocket & >( _SocketCommon::operator=( move( other ) ) );
+	return static_cast< TcpClientSocket & >( impl::SocketCommon::operator=( move( other ) ) );
 }
 
 SocketError TcpClientSocket::connect( const std::string & host, uint16_t port )
@@ -281,6 +336,7 @@ SocketError TcpClientSocket::connect( const std::string & host, uint16_t port )
 		return SocketError::NetworkingInitFailed;
 	}
 
+	// TODO: public getHostByname
 	char portStr [8];
 	snprintf( portStr, sizeof(portStr), "%hu", ushort(port) );
 
@@ -291,22 +347,47 @@ SocketError TcpClientSocket::connect( const std::string & host, uint16_t port )
 
 	// find protocol family and address of the host
 	struct addrinfo * ainfo;
-	if (getaddrinfo( host.c_str(), portStr, &hint, &ainfo ) != SUCCESS)
+	if (::getaddrinfo( host.c_str(), portStr, &hint, &ainfo ) != SUCCESS)
 	{
 		_lastSystemError = getLastError();
 		return SocketError::HostNotResolved;
 	}
-	auto ainfo_guard = at_scope_end_do( [ &ainfo ]() { freeaddrinfo( ainfo ); } );
+	auto ainfo_guard = at_scope_end_do( [ &ainfo ]() { ::freeaddrinfo( ainfo ); } );
 
+	return _connect( ainfo->ai_family, (int)ainfo->ai_addrlen, ainfo->ai_addr );
+}
+
+SocketError TcpClientSocket::connect( const IPAddr & addr, uint16_t port )
+{
+	if (_socket != INVALID_SOCK)
+	{
+		return SocketError::AlreadyConnected;
+	}
+
+	bool initialized = g_netSystem.initializeIfNotAlready();
+	if (!initialized)
+	{
+		_lastSystemError = getLastError();
+		return SocketError::NetworkingInitFailed;
+	}
+
+	struct sockaddr_storage saddr; int addrlen;
+	endpointToSockaddr( addr, port, &saddr, addrlen );
+
+	return _connect( saddr.ss_family, addrlen, (struct sockaddr *)&saddr );
+}
+
+SocketError TcpClientSocket::_connect( int family, int addrlen, struct sockaddr * addr )
+{
 	// create a corresponding socket
-	_socket = socket( ainfo->ai_family, ainfo->ai_socktype, ainfo->ai_protocol );
+	_socket = ::socket( family, SOCK_STREAM, 0 );
 	if (_socket == INVALID_SOCK)
 	{
 		_lastSystemError = getLastError();
 		return SocketError::Other;
 	}
 
-	if (::connect( _socket, ainfo->ai_addr, int( ainfo->ai_addrlen ) ) != SUCCESS)
+	if (::connect( _socket, addr, addrlen ) != SUCCESS)
 	{
 		_lastSystemError = getLastError();
 		_closeSocket( _socket );
@@ -320,12 +401,12 @@ SocketError TcpClientSocket::connect( const std::string & host, uint16_t port )
 
 SocketError TcpClientSocket::disconnect()
 {
-	return _SocketCommon::close();
+	return impl::SocketCommon::close();
 }
 
 bool TcpClientSocket::isConnected() const
 {
-	return _SocketCommon::isOpen();
+	return impl::SocketCommon::isOpen();
 }
 
 bool TcpClientSocket::isValid() const
@@ -340,18 +421,18 @@ bool TcpClientSocket::setTimeout( std::chrono::milliseconds timeout )
 	return success;
 }
 
-SocketError TcpClientSocket::send( const uint8_t * buffer, size_t size )
+SocketError TcpClientSocket::send( span< const uint8_t > buffer )
 {
 	if (_socket == INVALID_SOCK)
 	{
 		return SocketError::NotConnected;
 	}
 
-	const uint8_t * sendBegin = buffer;
-	size_t sendSize = size;
+	const uint8_t * sendBegin = buffer.data();
+	size_t sendSize = buffer.size();
 	while (sendSize > 0)
 	{
-		int sent = ::send( _socket, (const char *)sendBegin, int( sendSize ), 0 );
+		int sent = ::send( _socket, (const char *)sendBegin, (int)sendSize, 0 );
 		if (sent < 0)
 		{
 			_lastSystemError = getLastError();
@@ -365,22 +446,22 @@ SocketError TcpClientSocket::send( const uint8_t * buffer, size_t size )
 	return SocketError::Success;
 }
 
-SocketError TcpClientSocket::receive( uint8_t * buffer, size_t & size )
+SocketError TcpClientSocket::receive( span< uint8_t > buffer, size_t & totalReceived )
 {
 	if (_socket == INVALID_SOCK)
 	{
 		return SocketError::NotConnected;
 	}
 
-	uint8_t * recvBegin = buffer;
-	size_t recvSize = size;
+	uint8_t * recvBegin = buffer.data();
+	size_t recvSize = buffer.size();
 	while (recvSize > 0)
 	{
-		int received = ::recv( _socket, (char *)recvBegin, int( recvSize ), 0 );
+		int received = ::recv( _socket, (char *)recvBegin, (int)recvSize, 0 );
 		if (received <= 0)
 		{
 			_lastSystemError = getLastError();
-			size -= recvSize;  // this is how much we failed to receive
+			totalReceived = buffer.size() - recvSize;  // this is how much we failed to receive
 
 			if (received == 0)
 			{
@@ -406,15 +487,16 @@ SocketError TcpClientSocket::receive( uint8_t * buffer, size_t & size )
 	}
 
 	_lastSystemError = getLastError();
+	totalReceived = buffer.size();
 	return SocketError::Success;
 }
 
 //======================================================================================================================
 //  TcpServerSocket
 
-TcpServerSocket::TcpServerSocket() : _SocketCommon() {}
+TcpServerSocket::TcpServerSocket() : impl::SocketCommon() {}
 
-TcpServerSocket::~TcpServerSocket() {}  // delegate to _SocketCommon
+TcpServerSocket::~TcpServerSocket() {}  // delegate to SocketCommon
 
 TcpServerSocket::TcpServerSocket( TcpServerSocket && other )
 {
@@ -423,7 +505,7 @@ TcpServerSocket::TcpServerSocket( TcpServerSocket && other )
 
 TcpServerSocket & TcpServerSocket::operator=( TcpServerSocket && other )
 {
-	return static_cast< TcpServerSocket & >( _SocketCommon::operator=( move( other ) ) );
+	return static_cast< TcpServerSocket & >( impl::SocketCommon::operator=( move( other ) ) );
 }
 
 SocketError TcpServerSocket::open( uint16_t port )
@@ -447,7 +529,7 @@ SocketError TcpServerSocket::open( uint16_t port )
 	saddr.sin_port = htons( port );
 
 	// create a corresponding socket
-	_socket = socket( AF_INET, SOCK_STREAM, IPPROTO_TCP );
+	_socket = ::socket( AF_INET, SOCK_STREAM, IPPROTO_TCP );
 	if (_socket == INVALID_SOCK)
 	{
 		_lastSystemError = getLastError();
@@ -455,7 +537,7 @@ SocketError TcpServerSocket::open( uint16_t port )
 	}
 
 	// bind the socket to a local port
-	if (bind( _socket, (sockaddr *)&saddr, sizeof(saddr) ) != 0)
+	if (::bind( _socket, (sockaddr *)&saddr, sizeof(saddr) ) != 0)
 	{
 		_lastSystemError = getLastError();
 		_closeSocket( _socket );
@@ -465,7 +547,7 @@ SocketError TcpServerSocket::open( uint16_t port )
 
 	// set the socket to a listen state
 	static constexpr uint BACKLOG = 16;  // system queue for incoming connection requests TODO: user specified
-	if (listen( _socket, BACKLOG ) != 0)
+	if (::listen( _socket, BACKLOG ) != 0)
 	{
 		_lastSystemError = getLastError();
 		_closeSocket( _socket );
@@ -503,9 +585,9 @@ TcpClientSocket TcpServerSocket::accept()
 //======================================================================================================================
 //  UdpSocket
 
-UdpSocket::UdpSocket() : _SocketCommon() {}
+UdpSocket::UdpSocket() : impl::SocketCommon() {}
 
-UdpSocket::~UdpSocket() {}  // delegate to _SocketCommon
+UdpSocket::~UdpSocket() {}  // delegate to SocketCommon
 
 UdpSocket::UdpSocket( UdpSocket && other )
 {
@@ -514,7 +596,95 @@ UdpSocket::UdpSocket( UdpSocket && other )
 
 UdpSocket & UdpSocket::operator=( UdpSocket && other )
 {
-	return static_cast< UdpSocket & >( _SocketCommon::operator=( move( other ) ) );
+	return static_cast< UdpSocket & >( impl::SocketCommon::operator=( move( other ) ) );
+}
+
+SocketError UdpSocket::open( uint16_t port )
+{
+	if (_socket != INVALID_SOCK)
+	{
+		return SocketError::AlreadyOpen;
+	}
+
+	bool initialized = g_netSystem.initializeIfNotAlready();
+	if (!initialized)
+	{
+		_lastSystemError = getLastError();
+		return SocketError::NetworkingInitFailed;
+	}
+
+	// TODO: IPv4 vs IPv6
+	struct sockaddr_in saddr;
+	inet_pton( AF_INET, "127.0.0.1", &saddr.sin_addr );
+	saddr.sin_family = AF_INET;
+	saddr.sin_port = htons( port );
+
+	// create a corresponding socket
+	_socket = ::socket( AF_INET, SOCK_DGRAM, 0 );
+	if (_socket == INVALID_SOCK)
+	{
+		_lastSystemError = getLastError();
+		return SocketError::Other;
+	}
+
+	// bind the socket to a local port
+	if (::bind( _socket, (sockaddr *)&saddr, sizeof(saddr) ) != 0)
+	{
+		_lastSystemError = getLastError();
+		_closeSocket( _socket );
+		_socket = INVALID_SOCK;
+		return SocketError::BindFailed;
+	}
+
+	_lastSystemError = getLastError();
+	return SocketError::Success;
+}
+
+SocketError UdpSocket::sendTo( const IPAddr & addr, uint16_t port, span< const uint8_t > buffer )
+{
+	struct sockaddr_storage saddr; int addrlen;
+	endpointToSockaddr( addr, port, &saddr, addrlen );
+
+	int sent = ::sendto( _socket, (const char *)buffer.data(), (int)buffer.size(), 0, (struct sockaddr *)&saddr, addrlen );
+	if (sent < 0)
+	{
+		_lastSystemError = getLastError();
+		return SocketError::SendFailed;
+	}
+
+	_lastSystemError = getLastError();
+	return SocketError::Success;
+}
+
+SocketError UdpSocket::recvFrom( IPAddr & addr, uint16_t & port, span< uint8_t > buffer, size_t & totalReceived )
+{
+	struct sockaddr_storage saddr; int addrlen;
+	memset( &saddr, 0, sizeof(saddr) );
+	addrlen = sizeof(saddr);
+
+	int received = ::recvfrom( _socket, (char *)buffer.data(), (int)buffer.size(), 0, (struct sockaddr *)&saddr, &addrlen );
+	if (received < 0)
+	{
+		_lastSystemError = getLastError();
+		if (!_isBlocking && _isWouldBlock( _lastSystemError ))
+		{
+			return SocketError::WouldBlock;
+		}
+		else if (_isTimeout( _lastSystemError ))
+		{
+			return SocketError::Timeout;
+		}
+		else
+		{
+			return SocketError::Other;
+		}
+	}
+
+	sockaddrToEndpoint( &saddr, addr, port );
+
+	totalReceived = size_t( received );
+	_lastSystemError = getLastError();
+	return SocketError::Success;
 }
 
 
