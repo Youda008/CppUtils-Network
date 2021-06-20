@@ -37,6 +37,31 @@ namespace own {
 
 
 //======================================================================================================================
+//  error strings
+
+const char * enumString( SocketError error )
+{
+	switch (error)
+	{
+		case SocketError::Success:              return "Success";
+		case SocketError::AlreadyConnected:     return "AlreadyConnected";
+		case SocketError::NotConnected:         return "NotConnected";
+		case SocketError::NetworkingInitFailed: return "NetworkingInitFailed";
+		case SocketError::HostNotResolved:      return "HostNotResolved";
+		case SocketError::ConnectFailed:        return "ConnectFailed";
+		case SocketError::SendFailed:           return "SendFailed";
+		case SocketError::ConnectionClosed:     return "ConnectionClosed";
+		case SocketError::Timeout:              return "Timeout";
+		case SocketError::WouldBlock:           return "WouldBlock";
+		case SocketError::AlreadyOpen:          return "AlreadyOpen";
+		case SocketError::BindFailed:           return "BindFailed";
+		case SocketError::ListenFailed:         return "ListenFailed";
+		default:                                return "Other";
+	}
+}
+
+
+//======================================================================================================================
 //  address utils
 
 static void endpointToSockaddr( const IPAddr & ip, uint16_t port, struct sockaddr_storage * saddr, int & addrlen )

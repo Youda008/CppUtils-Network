@@ -51,6 +51,7 @@ enum class SocketError
 
 	Other = 255                 ///< Other system error. Call getLastSystemError() for more info.
 };
+const char * enumString( SocketError error );
 
 #ifdef _WIN32
 	using socket_t = uintptr_t;  // should be SOCKET but let's not include the whole big winsock2.h just because of this
