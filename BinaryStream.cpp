@@ -21,7 +21,7 @@ namespace own {
 //----------------------------------------------------------------------------------------------------------------------
 //  strings and arrays
 
-void BinaryOutputStream::writeBytes( span< const uint8_t > buffer )
+void BinaryOutputStream::writeBytes( const_byte_span buffer )
 {
 	memcpy( _curPos, buffer.data(), buffer.size() );
 	_curPos += buffer.size();
@@ -33,7 +33,7 @@ void BinaryOutputStream::writeString0( const string & str )
 	_curPos += str.size() + 1;
 }
 
-bool BinaryInputStream::readBytes( span< uint8_t > buffer )
+bool BinaryInputStream::readBytes( byte_span buffer )
 {
 	if (!canRead( buffer.size() )) {
 		return false;
@@ -50,8 +50,8 @@ bool BinaryInputStream::readString( string & str, size_t size )
 		return false;
 	}
 
-	str.resize( size, '0' );
-	memcpy( &*str.begin(), _curPos, size );
+	str.resize( size );
+	memcpy( const_cast< char * >( str.data() ), _curPos, size );
 	_curPos += size;
 	return true;
 }
@@ -64,8 +64,9 @@ bool BinaryInputStream::readString0( string & str )
 		if (strEndPos >= _endPos) {
 			_failed = true;
 		} else {
-			str.resize( size_t( strEndPos - _curPos ) );
-			copy( _curPos, strEndPos, str.begin() );
+			const size_t size = size_t( strEndPos - _curPos );
+			str.resize( size );
+			memcpy( const_cast< char * >( str.data() ), _curPos, size );
 			_curPos += str.size() + 1;
 		}
 	}
@@ -91,7 +92,7 @@ bool BinaryInputStream::readRemaining( std::string & str )
 {
 	const size_t size = size_t( _endPos - _curPos );
 	str.resize( size, '0' );
-	memcpy( &*str.begin(), _curPos, size );
+	memcpy( const_cast< char * >( str.data() ), _curPos, size );
 	_curPos += size;
 	return true;
 }

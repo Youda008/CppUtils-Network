@@ -49,17 +49,6 @@ int compareAddr( const uint8_t * a1, const uint8_t * a2, size_t size )
 //======================================================================================================================
 //  IPv4Addr
 
-IPv4Addr::IPv4Addr( span< const uint8_t > data )
-{
-	if (data.size() != sizeof(data))
-	{
-		throw std::invalid_argument(
-			"IPv4 address can only be constructed from a buffer of size 4, current size: "+std::to_string( data.size() )
-		);
-	}
-	copyAddr( data.data(), _data, sizeof(data) );
-}
-
 std::ostream & operator<<( std::ostream & os, IPv4Addr addr )
 {
 	os << uint(addr[0]) << '.' << uint( addr[1] ) << '.' << uint( addr[2] ) << '.' << uint( addr[3] );
@@ -74,17 +63,6 @@ std::ostream & operator>>( std::istream & /*os*/, IPv4Addr & /*addr*/ )
 
 //======================================================================================================================
 //  IPv6Addr
-
-IPv6Addr::IPv6Addr( span< const uint8_t > data )
-{
-	if (data.size() != sizeof(data))
-	{
-		throw std::invalid_argument(
-			"IPv6 address can only be constructed from a buffer of size 16, current size: "+std::to_string( data.size() )
-		);
-	}
-	copyAddr( data.data(), _data, sizeof(data) );
-}
 
 std::ostream & operator<<( std::ostream & /*os*/, const IPv6Addr & /*addr*/ )
 {
@@ -101,17 +79,17 @@ std::ostream & operator>>( std::istream & /*os*/, IPv6Addr & /*addr*/ )
 //  IPAddr
 
 // TODO: construct from fixed span with compile-time length
-IPAddr::IPAddr( span< const uint8_t > data )
+IPAddr::IPAddr( const_byte_span data )
 {
 	if (data.size() == 4)
 	{
-		_version = Ver::_4;
 		copyAddr( data.data(), _data, 4 );
+		_version = IPVer::_4;
 	}
 	else if (data.size() == 16)
 	{
-		_version = Ver::_6;
 		copyAddr( data.data(), _data, 16 );
+		_version = IPVer::_6;
 	}
 	else
 	{
@@ -125,13 +103,13 @@ IPAddr::IPAddr( std::initializer_list< uint8_t > initList )
 {
 	if (initList.size() == 4)
 	{
-		_version = Ver::_4;
 		copyAddr( &*initList.begin(), _data, 4 );
+		_version = IPVer::_4;
 	}
 	else if (initList.size() == 16)
 	{
-		_version = Ver::_6;
 		copyAddr( &*initList.begin(), _data, 16 );
+		_version = IPVer::_6;
 	}
 	else
 	{
@@ -143,7 +121,7 @@ IPAddr::IPAddr( std::initializer_list< uint8_t > initList )
 
 std::ostream & operator<<( std::ostream & os, const IPAddr & addr )
 {
-	if (addr.version() == IPAddr::Ver::_4)
+	if (addr.version() == IPVer::_4)
 	{
 		os << uint(addr[0]) << '.' << uint( addr[1] ) << '.' << uint( addr[2] ) << '.' << uint( addr[3] );
 	}
@@ -155,6 +133,19 @@ std::ostream & operator<<( std::ostream & os, const IPAddr & addr )
 }
 
 std::ostream & operator>>( std::istream & /*os*/, IPAddr & /*addr*/ )
+{
+	TODO
+}
+
+
+//======================================================================================================================
+
+std::ostream & operator<<( std::ostream & /*os*/, const MACAddr & /*addr*/ )
+{
+	TODO
+}
+
+std::ostream & operator>>( std::istream & /*os*/, MACAddr & /*addr*/ )
 {
 	TODO
 }

@@ -64,23 +64,23 @@ const char * enumString( SocketError error )
 //======================================================================================================================
 //  address utils
 
-static void endpointToSockaddr( const IPAddr & ip, uint16_t port, struct sockaddr_storage * saddr, int & addrlen )
+static void endpointToSockaddr( const Endpoint & ep, struct sockaddr_storage * saddr, int & addrlen )
 {
 	memset( saddr, 0, sizeof(*saddr) );
-	if (ip.version() == IPAddr::Ver::_4)
+	if (ep.addr.version() == IPVer::_4)
 	{
 		auto saddr4 = reinterpret_cast< struct sockaddr_in * >( saddr );
 		saddr4->sin_family = AF_INET;
-		memcpy( &saddr4->sin_addr, ip.data().data(), sizeof(saddr4->sin_addr) );
-		saddr4->sin_port = htons( port );
+		memcpy( &saddr4->sin_addr, ep.addr.data().data(), sizeof(saddr4->sin_addr) );
+		saddr4->sin_port = htons( ep.port );
 		addrlen = sizeof(sockaddr_in);
 	}
-	else if (ip.version() == IPAddr::Ver::_6)
+	else if (ep.addr.version() == IPVer::_6)
 	{
 		auto saddr6 = reinterpret_cast< struct sockaddr_in6 * >( saddr );
 		saddr6->sin6_family = AF_INET6;
-		memcpy( &saddr6->sin6_addr, ip.data().data(), sizeof(saddr6->sin6_addr) );
-		saddr6->sin6_port = htons( port );
+		memcpy( &saddr6->sin6_addr, ep.addr.data().data(), sizeof(saddr6->sin6_addr) );
+		saddr6->sin6_port = htons( ep.port );
 		addrlen = sizeof(sockaddr_in6);
 	}
 	else
@@ -89,19 +89,19 @@ static void endpointToSockaddr( const IPAddr & ip, uint16_t port, struct sockadd
 	}
 }
 
-static void sockaddrToEndpoint( const struct sockaddr_storage * saddr, IPAddr & ip, uint16_t & port )
+static void sockaddrToEndpoint( const struct sockaddr_storage * saddr, Endpoint & ep )
 {
 	if (saddr->ss_family == AF_INET)
 	{
 		auto saddr4 = reinterpret_cast< const struct sockaddr_in * >( saddr );
-		ip = IPAddr( span< uint8_t >( (uint8_t *)&saddr4->sin_addr, sizeof(saddr4->sin_addr) ) );
-		port = ntohs( saddr4->sin_port );
+		ep.addr = IPAddr( fixed_const_byte_span< sizeof(saddr4->sin_addr) >( (const uint8_t *)&saddr4->sin_addr ) );
+		ep.port = ntohs( saddr4->sin_port );
 	}
 	else if (saddr->ss_family == AF_INET6)
 	{
 		auto saddr6 = reinterpret_cast< const struct sockaddr_in6 * >( saddr );
-		ip = IPAddr( span< uint8_t >( (uint8_t *)&saddr6->sin6_addr, sizeof(saddr6->sin6_addr) ) );
-		port = ntohs( saddr6->sin6_port );
+		ep.addr = IPAddr( fixed_const_byte_span< sizeof(saddr6->sin6_addr) >( (const uint8_t *)&saddr6->sin6_addr ) );
+		ep.port = ntohs( saddr6->sin6_port );
 	}
 	else
 	{
@@ -397,7 +397,7 @@ SocketError TcpClientSocket::connect( const IPAddr & addr, uint16_t port )
 	}
 
 	struct sockaddr_storage saddr; int addrlen;
-	endpointToSockaddr( addr, port, &saddr, addrlen );
+	endpointToSockaddr( { addr, port }, &saddr, addrlen );
 
 	return _connect( saddr.ss_family, addrlen, (struct sockaddr *)&saddr );
 }
@@ -446,7 +446,7 @@ bool TcpClientSocket::setTimeout( std::chrono::milliseconds timeout )
 	return success;
 }
 
-SocketError TcpClientSocket::send( span< const uint8_t > buffer )
+SocketError TcpClientSocket::send( const_byte_span buffer )
 {
 	if (_socket == INVALID_SOCK)
 	{
@@ -471,7 +471,7 @@ SocketError TcpClientSocket::send( span< const uint8_t > buffer )
 	return SocketError::Success;
 }
 
-SocketError TcpClientSocket::receive( span< uint8_t > buffer, size_t & totalReceived )
+SocketError TcpClientSocket::receive( byte_span buffer, size_t & totalReceived )
 {
 	if (_socket == INVALID_SOCK)
 	{
@@ -653,22 +653,25 @@ SocketError UdpSocket::open( uint16_t port )
 	}
 
 	// bind the socket to a local port
-	if (::bind( _socket, (sockaddr *)&saddr, sizeof(saddr) ) != 0)
+	if (port != 0)
 	{
-		_lastSystemError = getLastError();
-		_closeSocket( _socket );
-		_socket = INVALID_SOCK;
-		return SocketError::BindFailed;
+		if (::bind( _socket, (sockaddr *)&saddr, sizeof(saddr) ) != 0)
+		{
+			_lastSystemError = getLastError();
+			_closeSocket( _socket );
+			_socket = INVALID_SOCK;
+			return SocketError::BindFailed;
+		}
 	}
 
 	_lastSystemError = getLastError();
 	return SocketError::Success;
 }
 
-SocketError UdpSocket::sendTo( const IPAddr & addr, uint16_t port, span< const uint8_t > buffer )
+SocketError UdpSocket::sendTo( const Endpoint & endpoint, const_byte_span buffer )
 {
 	struct sockaddr_storage saddr; int addrlen;
-	endpointToSockaddr( addr, port, &saddr, addrlen );
+	endpointToSockaddr( endpoint, &saddr, addrlen );
 
 	int sent = ::sendto( _socket, (const char *)buffer.data(), (int)buffer.size(), 0, (struct sockaddr *)&saddr, addrlen );
 	if (sent < 0)
@@ -681,7 +684,7 @@ SocketError UdpSocket::sendTo( const IPAddr & addr, uint16_t port, span< const u
 	return SocketError::Success;
 }
 
-SocketError UdpSocket::recvFrom( IPAddr & addr, uint16_t & port, span< uint8_t > buffer, size_t & totalReceived )
+SocketError UdpSocket::recvFrom( Endpoint & endpoint, byte_span buffer, size_t & totalReceived )
 {
 	struct sockaddr_storage saddr; int addrlen;
 	memset( &saddr, 0, sizeof(saddr) );
@@ -705,7 +708,7 @@ SocketError UdpSocket::recvFrom( IPAddr & addr, uint16_t & port, span< uint8_t >
 		}
 	}
 
-	sockaddrToEndpoint( &saddr, addr, port );
+	sockaddrToEndpoint( &saddr, endpoint );
 
 	totalReceived = size_t( received );
 	_lastSystemError = getLastError();

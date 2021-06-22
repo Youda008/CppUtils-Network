@@ -133,23 +133,13 @@ class TcpClientSocket : public impl::SocketCommon
 
 	/** Sends given number of bytes to the socket. If the system does not accept that amount of data all at once,
 	  * it repeats the system calls until all requested data are sent. */
-	SocketError send( span< const uint8_t > buffer );
-
-	/** TODO */
-	SocketError send( const std::string & strMessage )
-	{
-		return send( span< const char >( strMessage ).cast< const uint8_t >() );
-	}
-	SocketError send( const char * strMessage )
-	{
-		return send( std::string( strMessage ) );
-	}
+	SocketError send( const_byte_span buffer );
 
 	/** Receive the given number of bytes from the socket. If the requested amount of data don't arrive all at once,
 	  * it repeats the system calls until all requested data are received.
 	  * The number of bytes actually received is stored in an output parameter.
 	  * @param[out] received - how many bytes were really received */
-	SocketError receive( span< uint8_t > buffer, size_t & received );
+	SocketError receive( byte_span buffer, size_t & received );
 
 	/** Receive the given number of bytes from the socket. If the requested amount of data don't arrive all at once,
 	  * it repeats the system calls until all requested data are received.
@@ -159,7 +149,7 @@ class TcpClientSocket : public impl::SocketCommon
 	{
 		buffer.resize( size );  // allocate the needed storage
 		size_t received;
-		SocketError result = receive( span< uint8_t >( buffer ), received );
+		SocketError result = receive( byte_span( buffer.data(), buffer.size() ), received );
 		buffer.resize( received );  // let's return the user a vector only as big as how much we actually received
 		return result;
 	}
@@ -214,22 +204,13 @@ class UdpSocket : public impl::SocketCommon
 	UdpSocket & operator=( UdpSocket && other );
 
 	/** Opens an UDP socket on selected port. */
-	SocketError open( uint16_t port );
+	SocketError open( uint16_t port = 0 );
 
 	/** TODO */
-	SocketError sendTo( const IPAddr & addr, uint16_t port, span< const uint8_t > buffer );
-
-	SocketError sendTo( const IPAddr & addr, uint16_t port, const std::string & strMessage )
-	{
-		return sendTo( addr, port, span< const char >( strMessage ).cast< const uint8_t >() );
-	}
-	SocketError sendTo( const IPAddr & addr, uint16_t port, const char * strMessage )
-	{
-		return sendTo( addr, port, std::string( strMessage ) );
-	}
+	SocketError sendTo( const Endpoint & endpoint, const_byte_span buffer );
 
 	/** TODO */
-	SocketError recvFrom( IPAddr & addr, uint16_t & port, span< uint8_t > buffer, size_t & received );
+	SocketError recvFrom( Endpoint & endpoint, byte_span buffer, size_t & received );
 
 };
 

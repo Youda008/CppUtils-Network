@@ -32,13 +32,13 @@ class BinaryOutputStream
 	/** WARNING: The class takes non-owning reference to a buffer stored somewhere else and doesn't remember anything
 	  * about its original type. You are responsible for making sure the buffer exists at least as long as this object
 	  * and for allocating the storage big enough for all write operations to fit in. */
-	BinaryOutputStream( span< uint8_t > buffer ) : _curPos( buffer.begin() ), _endPos( buffer.end() ) {}
+	BinaryOutputStream( byte_span buffer ) : _curPos( buffer.begin() ), _endPos( buffer.end() ) {}
 
 	BinaryOutputStream( const BinaryOutputStream & other ) = delete;
 	BinaryOutputStream( BinaryOutputStream && other ) = delete;
 	BinaryOutputStream & operator=( const BinaryOutputStream & other ) = delete;
 
-	void reset( span< uint8_t > buffer )         { _curPos = buffer.begin(); _endPos = buffer.end(); }
+	void reset( byte_span buffer )         { _curPos = buffer.begin(); _endPos = buffer.end(); }
 
 	//-- atomic elements -----------------------------------------------------------------------------------------------
 
@@ -108,15 +108,15 @@ class BinaryOutputStream
 
 	//-- strings and arrays --------------------------------------------------------------------------------------------
 
-	void writeBytes( span< const uint8_t > buffer );
+	void writeBytes( const_byte_span buffer );
 
 	/** Writes a string WITHOUT its null terminator to the buffer. */
-	void writeString( const std::string & str )  { writeBytes( span< const char >( str ).cast< const uint8_t >() ); }
+	void writeString( const std::string & str )  { writeBytes( make_span( str ).cast< const uint8_t >() ); }
 
 	/** Writes a string WITH its null terminator to the buffer. */
 	void writeString0( const std::string & str );
 
-	BinaryOutputStream & operator<<( span< const uint8_t > buffer )
+	BinaryOutputStream & operator<<( const_byte_span buffer )
 	{
 		writeBytes( buffer );
 		return *this;
@@ -155,13 +155,13 @@ class BinaryInputStream
 
 	/** WARNING: The class takes non-owning reference to a buffer stored somewhere else and doesn't remember anything
 	  * about its original type. You are responsible for making sure the buffer exists at least as long as this object. */
-	BinaryInputStream( span< const uint8_t > buffer ) : _curPos( buffer.data() ), _endPos( buffer.data() + buffer.size() ) {}
+	BinaryInputStream( const_byte_span buffer ) : _curPos( buffer.data() ), _endPos( buffer.data() + buffer.size() ) {}
 
 	BinaryInputStream( const BinaryInputStream & other ) = delete;
 	BinaryInputStream( BinaryInputStream && other ) = delete;
 	BinaryInputStream & operator=( const BinaryInputStream & other ) = delete;
 
-	void reset( span< const uint8_t > buffer )     { _curPos = buffer.data(); _endPos = buffer.data() + buffer.size(); }
+	void reset( const_byte_span buffer )     { _curPos = buffer.data(); _endPos = buffer.data() + buffer.size(); }
 
 	//-- atomic elements -----------------------------------------------------------------------------------------------
 
@@ -299,7 +299,7 @@ class BinaryInputStream
 
 	//-- strings and arrays --------------------------------------------------------------------------------------------
 
-	bool readBytes( span< uint8_t > buffer );
+	bool readBytes( byte_span buffer );
 
 	/** Reads a string of specified size from the buffer.
 	  * (output parameter variant) */
@@ -327,7 +327,7 @@ class BinaryInputStream
 		return str;
 	}
 
-	BinaryInputStream & operator>>( span< uint8_t > buffer )
+	BinaryInputStream & operator>>( byte_span buffer )
 	{
 		readBytes( buffer );
 		return *this;
