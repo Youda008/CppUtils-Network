@@ -13,6 +13,7 @@
 
 #include "Span.hpp"
 #include "LangUtils.hpp"  // enumToInt
+#include "StringUtils.hpp"
 
 #include <string>
 #include <vector>
