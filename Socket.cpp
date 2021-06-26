@@ -8,6 +8,7 @@
 #include "Socket.hpp"
 
 #include "LangUtils.hpp"  // scope_guard
+#include "CriticalError.hpp"
 
 #ifdef _WIN32
 	#include <winsock2.h>      // socket, closesocket
@@ -57,56 +58,6 @@ const char * enumString( SocketError error )
 		case SocketError::BindFailed:           return "BindFailed";
 		case SocketError::ListenFailed:         return "ListenFailed";
 		default:                                return "Other";
-	}
-}
-
-
-//======================================================================================================================
-//  address utils
-
-static void endpointToSockaddr( const Endpoint & ep, struct sockaddr_storage * saddr, int & addrlen )
-{
-	memset( saddr, 0, sizeof(*saddr) );
-	if (ep.addr.version() == IPVer::_4)
-	{
-		auto saddr4 = reinterpret_cast< struct sockaddr_in * >( saddr );
-		saddr4->sin_family = AF_INET;
-		memcpy( &saddr4->sin_addr, ep.addr.data().data(), sizeof(saddr4->sin_addr) );
-		saddr4->sin_port = htons( ep.port );
-		addrlen = sizeof(sockaddr_in);
-	}
-	else if (ep.addr.version() == IPVer::_6)
-	{
-		auto saddr6 = reinterpret_cast< struct sockaddr_in6 * >( saddr );
-		saddr6->sin6_family = AF_INET6;
-		memcpy( &saddr6->sin6_addr, ep.addr.data().data(), sizeof(saddr6->sin6_addr) );
-		saddr6->sin6_port = htons( ep.port );
-		addrlen = sizeof(sockaddr_in6);
-	}
-	else
-	{
-		throw std::invalid_argument("attempted socket operation with uninitialized IPAddr");
-	}
-}
-
-static void sockaddrToEndpoint( const struct sockaddr_storage * saddr, Endpoint & ep )
-{
-	if (saddr->ss_family == AF_INET)
-	{
-		auto saddr4 = reinterpret_cast< const struct sockaddr_in * >( saddr );
-		ep.addr = IPAddr( fixed_const_byte_span< sizeof(saddr4->sin_addr) >( (const uint8_t *)&saddr4->sin_addr ) );
-		ep.port = ntohs( saddr4->sin_port );
-	}
-	else if (saddr->ss_family == AF_INET6)
-	{
-		auto saddr6 = reinterpret_cast< const struct sockaddr_in6 * >( saddr );
-		ep.addr = IPAddr( fixed_const_byte_span< sizeof(saddr6->sin6_addr) >( (const uint8_t *)&saddr6->sin6_addr ) );
-		ep.port = ntohs( saddr6->sin6_port );
-	}
-	else
-	{
-		// TODO: return value
-		throw std::invalid_argument("socket operation returned unexpected address family");
 	}
 }
 
@@ -361,7 +312,6 @@ SocketError TcpClientSocket::connect( const std::string & host, uint16_t port )
 		return SocketError::NetworkingInitFailed;
 	}
 
-	// TODO: public getHostByname
 	char portStr [8];
 	snprintf( portStr, sizeof(portStr), "%hu", ushort(port) );
 
@@ -397,7 +347,7 @@ SocketError TcpClientSocket::connect( const IPAddr & addr, uint16_t port )
 	}
 
 	struct sockaddr_storage saddr; int addrlen;
-	endpointToSockaddr( { addr, port }, &saddr, addrlen );
+	endpointToSockaddr( { addr, port }, (struct sockaddr *)&saddr, addrlen );
 
 	return _connect( saddr.ss_family, addrlen, (struct sockaddr *)&saddr );
 }
@@ -671,7 +621,7 @@ SocketError UdpSocket::open( uint16_t port )
 SocketError UdpSocket::sendTo( const Endpoint & endpoint, const_byte_span buffer )
 {
 	struct sockaddr_storage saddr; int addrlen;
-	endpointToSockaddr( endpoint, &saddr, addrlen );
+	endpointToSockaddr( endpoint, (struct sockaddr *)&saddr, addrlen );
 
 	int sent = ::sendto( _socket, (const char *)buffer.data(), (int)buffer.size(), 0, (struct sockaddr *)&saddr, addrlen );
 	if (sent < 0)
@@ -708,7 +658,7 @@ SocketError UdpSocket::recvFrom( Endpoint & endpoint, byte_span buffer, size_t &
 		}
 	}
 
-	sockaddrToEndpoint( &saddr, endpoint );
+	sockaddrToEndpoint( (struct sockaddr *)&saddr, endpoint );
 
 	totalReceived = size_t( received );
 	_lastSystemError = getLastError();
