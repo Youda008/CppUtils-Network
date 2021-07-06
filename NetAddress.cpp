@@ -36,14 +36,14 @@ using namespace impl;
 
 namespace impl {
 
-int genericCompare( const uint8_t * a1, const uint8_t * a2, size_t size )
-{
-	return std::lexicographical_compare( a1, a1 + size, a2, a2 + size );
-}
-
-void genericCopy( const uint8_t * src, uint8_t * dst, size_t size )
+void genericCopy( const uint8_t * src, uint8_t * dst, size_t size ) noexcept
 {
 	memcpy( dst, src, size );
+}
+
+int genericCompare( const uint8_t * a1, const uint8_t * a2, size_t size ) noexcept
+{
+	return std::lexicographical_compare( a1, a1 + size, a2, a2 + size );
 }
 
 static std::ostream & ipv4ToStream( std::ostream & os, const uint8_t * bytes )
@@ -52,7 +52,7 @@ static std::ostream & ipv4ToStream( std::ostream & os, const uint8_t * bytes )
 	struct in_addr addr;
 	impl::ownAddrToSysAddrV4( bytes, &addr );
 	if (!inet_ntop( AF_INET, &addr, str, sizeof(str) ))
-		critical_error( "failed to convert IPv4 address to string" );
+		critical_error( "Failed to convert IPv4 address to string." );
 	os << str;
 	return os;
 }
@@ -63,7 +63,7 @@ static std::ostream & ipv6ToStream( std::ostream & os, const uint8_t * bytes )
 	struct in6_addr addr;
 	impl::ownAddrToSysAddrV6( bytes, &addr );
 	if (!inet_ntop( AF_INET6, &addr, str, sizeof(str) ))
-		critical_error( "failed to convert IPv6 address to string" );
+		critical_error( "Failed to convert IPv6 address to string." );
 	os << str;
 	return os;
 }
@@ -150,26 +150,6 @@ std::istream & operator>>( std::istream & is, IPv6Addr & addr )
 //======================================================================================================================
 //  IPAddr
 
-IPAddr::IPAddr( const_byte_span data )
-{
-	if (data.size() == 4)
-	{
-		impl::fastCopy4( data.data(), _data );
-		_version = IPVer::_4;
-	}
-	else if (data.size() == 16)
-	{
-		impl::fastCopy6( data.data(), _data );
-		_version = IPVer::_6;
-	}
-	else
-	{
-		critical_error(
-			"IP address can only be constructed from a buffer of size 4 or 16, current size: %u", uint( data.size() )
-		);
-	}
-}
-
 IPAddr::IPAddr( std::initializer_list< uint8_t > initList )
 {
 	if (initList.size() == 4)
@@ -179,29 +159,35 @@ IPAddr::IPAddr( std::initializer_list< uint8_t > initList )
 	}
 	else if (initList.size() == 16)
 	{
-		impl::fastCopy6( initList.begin(), _data );
+		impl::fastCopy16( initList.begin(), _data );
 		_version = IPVer::_6;
 	}
 	else
 	{
 		critical_error(
-			"IP address can only be constructed from a buffer of size 4 or 16, current size: %u", uint( initList.size() )
+			"IP address can only be constructed from a buffer of size 4 or 16, current size: %zu", initList.size()
 		);
 	}
 }
 
-IPv4Addr IPAddr::v4() const
+IPAddr::IPAddr( const_byte_span data )
 {
-	if (_version != IPVer::_4)
-		critical_error( "Attempted to convert IPAddr of version %u to IPv4Addr", uint(_version) );
-	return IPv4Addr( fixed_const_byte_span<4>( _data ) );
-}
-
-IPv6Addr IPAddr::v6() const
-{
-	if (_version != IPVer::_6)
-		critical_error( "Attempted to convert IPAddr of version %u to IPv6Addr", uint(_version) );
-	return IPv6Addr( fixed_const_byte_span<16>( _data ) );
+	if (data.size() == 4)
+	{
+		impl::fastCopy4( data.data(), _data );
+		_version = IPVer::_4;
+	}
+	else if (data.size() == 16)
+	{
+		impl::fastCopy16( data.data(), _data );
+		_version = IPVer::_6;
+	}
+	else
+	{
+		critical_error(
+			"IP address can only be constructed from a buffer of size 4 or 16, current size: %zu", data.size()
+		);
+	}
 }
 
 std::ostream & operator<<( std::ostream & os, const IPAddr & addr )
@@ -211,7 +197,7 @@ std::ostream & operator<<( std::ostream & os, const IPAddr & addr )
 	else if (addr.version() == IPVer::_6)
 		return impl::ipv6ToStream( os, addr.data().data() );
 	else
-		critical_error( "Attempted to print uninitialized IPAddr" );
+		critical_error( "Attempted to print uninitialized IPAddr." );
 }
 
 std::istream & operator>>( std::istream & is, IPAddr & addr )
@@ -258,7 +244,7 @@ void endpointToSockaddr( const Endpoint & ep, struct sockaddr * saddr, int & add
 	}
 	else
 	{
-		critical_error( "attempted socket operation with uninitialized IPAddr" );
+		critical_error( "Attempted socket operation with uninitialized IPAddr." );
 	}
 }
 
@@ -278,8 +264,7 @@ void sockaddrToEndpoint( const struct sockaddr * saddr, Endpoint & ep )
 	}
 	else
 	{
-		// TODO: return value
-		throw std::invalid_argument("socket operation returned unexpected address family");
+		critical_error( "Socket operation returned unexpected address family." );
 	}
 }
 

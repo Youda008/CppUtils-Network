@@ -136,21 +136,21 @@ static NetworkingSubsystem g_netSystem;  // this will get initialized on first u
 
 namespace impl {
 
-SocketCommon::SocketCommon()
+SocketCommon::SocketCommon() noexcept
 :
 	_socket( INVALID_SOCK ),
 	_lastSystemError( SUCCESS ),
 	_isBlocking( true )
 {}
 
-SocketCommon::SocketCommon( socket_t sock )
+SocketCommon::SocketCommon( socket_t sock ) noexcept
 :
 	_socket( sock ),
 	_lastSystemError( SUCCESS ),
 	_isBlocking( true )
 {}
 
-SocketCommon::~SocketCommon()
+SocketCommon::~SocketCommon() noexcept
 {
 	if (_socket == INVALID_SOCK)
 	{
@@ -162,12 +162,12 @@ SocketCommon::~SocketCommon()
 	_closeSocket( _socket );
 }
 
-SocketCommon::SocketCommon( SocketCommon && other )
+SocketCommon::SocketCommon( SocketCommon && other ) noexcept
 {
 	*this = move( other );
 }
 
-SocketCommon & SocketCommon::operator=( SocketCommon && other )
+SocketCommon & SocketCommon::operator=( SocketCommon && other ) noexcept
 {
 	_socket = other._socket;
 	_lastSystemError = other._lastSystemError;
@@ -179,7 +179,7 @@ SocketCommon & SocketCommon::operator=( SocketCommon && other )
 	return *this;
 }
 
-SocketError SocketCommon::close()
+SocketError SocketCommon::close() noexcept
 {
 	if (_socket == INVALID_SOCK)
 	{
@@ -205,12 +205,22 @@ SocketError SocketCommon::close()
 	return SocketError::Success;
 }
 
-bool SocketCommon::isOpen() const
+bool SocketCommon::isOpen() const noexcept
 {
 	return _socket != INVALID_SOCK;
 }
 
-bool SocketCommon::_shutdownSocket( socket_t sock )
+bool SocketCommon::setBlockingMode( bool enable ) noexcept
+{
+	bool success = _setBlockingMode( _socket, enable );
+	if (success)
+		_isBlocking = enable;
+	else
+		_lastSystemError = getLastError();
+	return success;
+}
+
+bool SocketCommon::_shutdownSocket( socket_t sock ) noexcept
 {
  #ifdef _WIN32
 	return ::shutdown( sock, SD_BOTH ) == 0;
@@ -219,7 +229,7 @@ bool SocketCommon::_shutdownSocket( socket_t sock )
  #endif // _WIN32
 }
 
-bool SocketCommon::_closeSocket( socket_t sock )
+bool SocketCommon::_closeSocket( socket_t sock ) noexcept
 {
  #ifdef _WIN32
 	return ::closesocket( sock ) == 0;
@@ -228,7 +238,7 @@ bool SocketCommon::_closeSocket( socket_t sock )
  #endif // _WIN32
 }
 
-bool SocketCommon::_setTimeout( socket_t sock, std::chrono::milliseconds timeout_ms )
+bool SocketCommon::_setTimeout( socket_t sock, std::chrono::milliseconds timeout_ms ) noexcept
 {
  #ifdef _WIN32
 	DWORD timeout = (DWORD)timeout_ms.count();
@@ -241,7 +251,7 @@ bool SocketCommon::_setTimeout( socket_t sock, std::chrono::milliseconds timeout
 	return ::setsockopt( sock, SOL_SOCKET, SO_RCVTIMEO, (char *)&timeout, sizeof(timeout) ) == 0;
 }
 
-bool SocketCommon::_isTimeout( system_error_t errorCode )
+bool SocketCommon::_isTimeout( system_error_t errorCode ) noexcept
 {
  #ifdef _WIN32
 	return errorCode == WSAETIMEDOUT;
@@ -250,7 +260,7 @@ bool SocketCommon::_isTimeout( system_error_t errorCode )
  #endif // _WIN32
 }
 
-bool SocketCommon::_isWouldBlock( system_error_t errorCode )
+bool SocketCommon::_isWouldBlock( system_error_t errorCode ) noexcept
 {
  #ifdef _WIN32
 	return errorCode == WSAEWOULDBLOCK;
@@ -259,7 +269,7 @@ bool SocketCommon::_isWouldBlock( system_error_t errorCode )
  #endif // _WIN32
 }
 
-bool SocketCommon::_setBlockingMode( socket_t sock, bool enable )
+bool SocketCommon::_setBlockingMode( socket_t sock, bool enable ) noexcept
 {
 #ifdef _WIN32
 	unsigned long mode = enable ? 0 : 1;
@@ -284,16 +294,16 @@ bool SocketCommon::_setBlockingMode( socket_t sock, bool enable )
 //======================================================================================================================
 //  TcpSocket
 
-TcpClientSocket::TcpClientSocket() : impl::SocketCommon() {}
+TcpClientSocket::TcpClientSocket() noexcept : impl::SocketCommon() {}
 
-TcpClientSocket::~TcpClientSocket() {}  // delegate to SocketCommon
+TcpClientSocket::~TcpClientSocket() noexcept {}  // delegate to SocketCommon
 
-TcpClientSocket::TcpClientSocket( TcpClientSocket && other )
+TcpClientSocket::TcpClientSocket( TcpClientSocket && other ) noexcept
 {
 	*this = move( other );
 }
 
-TcpClientSocket & TcpClientSocket::operator=( TcpClientSocket && other )
+TcpClientSocket & TcpClientSocket::operator=( TcpClientSocket && other ) noexcept
 {
 	return static_cast< TcpClientSocket & >( impl::SocketCommon::operator=( move( other ) ) );
 }
@@ -374,22 +384,22 @@ SocketError TcpClientSocket::_connect( int family, int addrlen, struct sockaddr 
 	return SocketError::Success;
 }
 
-SocketError TcpClientSocket::disconnect()
+SocketError TcpClientSocket::disconnect() noexcept
 {
 	return impl::SocketCommon::close();
 }
 
-bool TcpClientSocket::isConnected() const
+bool TcpClientSocket::isConnected() const noexcept
 {
 	return impl::SocketCommon::isOpen();
 }
 
-bool TcpClientSocket::isValid() const
+bool TcpClientSocket::isValid() const noexcept
 {
 	return _socket != INVALID_SOCK;
 }
 
-bool TcpClientSocket::setTimeout( std::chrono::milliseconds timeout )
+bool TcpClientSocket::setTimeout( std::chrono::milliseconds timeout ) noexcept
 {
 	bool success = _setTimeout( _socket, timeout );
 	_lastSystemError = getLastError();
@@ -469,16 +479,16 @@ SocketError TcpClientSocket::receive( byte_span buffer, size_t & totalReceived )
 //======================================================================================================================
 //  TcpServerSocket
 
-TcpServerSocket::TcpServerSocket() : impl::SocketCommon() {}
+TcpServerSocket::TcpServerSocket() noexcept : impl::SocketCommon() {}
 
-TcpServerSocket::~TcpServerSocket() {}  // delegate to SocketCommon
+TcpServerSocket::~TcpServerSocket() noexcept {}  // delegate to SocketCommon
 
-TcpServerSocket::TcpServerSocket( TcpServerSocket && other )
+TcpServerSocket::TcpServerSocket( TcpServerSocket && other ) noexcept
 {
 	*this = move( other );
 }
 
-TcpServerSocket & TcpServerSocket::operator=( TcpServerSocket && other )
+TcpServerSocket & TcpServerSocket::operator=( TcpServerSocket && other ) noexcept
 {
 	return static_cast< TcpServerSocket & >( impl::SocketCommon::operator=( move( other ) ) );
 }
@@ -560,16 +570,16 @@ TcpClientSocket TcpServerSocket::accept()
 //======================================================================================================================
 //  UdpSocket
 
-UdpSocket::UdpSocket() : impl::SocketCommon() {}
+UdpSocket::UdpSocket() noexcept : impl::SocketCommon() {}
 
-UdpSocket::~UdpSocket() {}  // delegate to SocketCommon
+UdpSocket::~UdpSocket() noexcept {}  // delegate to SocketCommon
 
-UdpSocket::UdpSocket( UdpSocket && other )
+UdpSocket::UdpSocket( UdpSocket && other ) noexcept
 {
 	*this = move( other );
 }
 
-UdpSocket & UdpSocket::operator=( UdpSocket && other )
+UdpSocket & UdpSocket::operator=( UdpSocket && other ) noexcept
 {
 	return static_cast< UdpSocket & >( impl::SocketCommon::operator=( move( other ) ) );
 }

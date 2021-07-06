@@ -20,7 +20,7 @@ namespace own {
 
 //======================================================================================================================
 
-system_error_t getLastError()
+system_error_t getLastError() noexcept
 {
  #ifdef _WIN32
 	return GetLastError();

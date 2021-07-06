@@ -23,7 +23,7 @@ namespace own {
 #endif
 
 /** OS-independent way to retrieve the error code of the last system call */
-system_error_t getLastError();
+system_error_t getLastError() noexcept;
 
 /** OS-independent way to convert an error code to a readable error message */
 std::string getErrorString( system_error_t errorCode );

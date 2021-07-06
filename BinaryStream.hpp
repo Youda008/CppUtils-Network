@@ -13,7 +13,7 @@
 
 #include "Span.hpp"
 #include "LangUtils.hpp"  // enumToInt
-#include "StringUtils.hpp"
+#include "CriticalError.hpp"
 
 #include <string>
 #include <vector>
@@ -23,28 +23,33 @@ namespace own {
 
 
 //======================================================================================================================
-/** binary buffer input stream allowing serialization via operator << */
+/// Binary buffer output stream allowing serialization via operator<< .
+/** This is a binary alternative of std::ostringstream. First you allocate a buffer, then you construct this stream
+  * object, and then you write all the data you need using operator<< or named methods. */
 
 class BinaryOutputStream
 {
 
  public:
 
-	/** WARNING: The class takes non-owning reference to a buffer stored somewhere else and doesn't remember anything
+	/// Initializes a binary output stream operating over any byte container with continuous memory.
+	/** WARNING: The class takes non-owning reference to the buffer stored somewhere else and doesn't remember anything
 	  * about its original type. You are responsible for making sure the buffer exists at least as long as this object
 	  * and for allocating the storage big enough for all write operations to fit in. */
-	BinaryOutputStream( byte_span buffer ) : _curPos( buffer.begin() ), _endPos( buffer.end() ) {}
+	BinaryOutputStream( byte_span buffer ) noexcept : _curPos( &*buffer.begin() ), _endPos( &*buffer.end() ) {}
 
 	BinaryOutputStream( const BinaryOutputStream & other ) = delete;
 	BinaryOutputStream( BinaryOutputStream && other ) = delete;
 	BinaryOutputStream & operator=( const BinaryOutputStream & other ) = delete;
 
-	void reset( byte_span buffer )         { _curPos = buffer.begin(); _endPos = buffer.end(); }
+	void reset( byte_span buffer ) noexcept  { _curPos = &*buffer.begin(); _endPos = &*buffer.end(); }
 
 	//-- atomic elements -----------------------------------------------------------------------------------------------
 
 	BinaryOutputStream & operator<<( uint8_t b )
 	{
+		checkWrite( 1, "byte" );
+
 		*_curPos = b;
 		_curPos++;
 		return *this;
@@ -52,6 +57,8 @@ class BinaryOutputStream
 
 	BinaryOutputStream & operator<<( char c )
 	{
+		checkWrite( 1, "char" );
+
 		*_curPos = uint8_t(c);
 		_curPos++;
 		return *this;
@@ -59,9 +66,91 @@ class BinaryOutputStream
 
 	//-- integers ------------------------------------------------------------------------------------------------------
 
-	/** Converts an arbitrary integral number from native format to big endian and writes it into the buffer. */
+	/// Converts an arbitrary integral number from native format to big endian and writes it into the buffer.
 	template< typename IntType, typename std::enable_if< std::is_integral<IntType>::value, int >::type = 0 >
 	void writeIntBE( IntType native )
+	{
+		checkWrite( sizeof(native), "int" );
+		_writeIntBE( native );
+	}
+
+	/// Converts an arbitrary integral number from native format to little endian and writes it into the buffer.
+	template< typename IntType, typename std::enable_if< std::is_integral<IntType>::value, int >::type = 0 >
+	void writeIntLE( IntType native )
+	{
+		checkWrite( sizeof(native), "int" );
+		_writeIntBE( native );
+	}
+
+	/// Converts an integer representation of an enum value from native format to big endian and writes it into the buffer.
+	template< typename EnumType, typename std::enable_if< std::is_enum<EnumType>::value, int >::type = 0 >
+	void writeEnumBE( EnumType native )
+	{
+		checkWrite( sizeof(native), "enum" );
+		writeIntBE( enumToInt( native ) );
+	}
+
+	/// Converts an integer representation of an enum value from native format to little endian and writes it into the buffer.
+	template< typename EnumType, typename std::enable_if< std::is_enum<EnumType>::value, int >::type = 0 >
+	void writeEnumLE( EnumType native )
+	{
+		checkWrite( sizeof(native), "enum" );
+		writeIntLE( enumToInt( native ) );
+	}
+
+	//-- strings and arrays --------------------------------------------------------------------------------------------
+
+	/// Writes specified number of bytes from a continuous memory storage to the buffer.
+	void writeBytes( const_byte_span buffer )
+	{
+		checkWrite( buffer.size(), "bytes" );
+		_writeBytes( buffer );
+	}
+
+	/// Writes a string WITHOUT its null terminator to the buffer.
+	void writeString( const std::string & str )
+	{
+		checkWrite( str.size(), "string" );
+		_writeBytes( const_char_span( str.data(), str.size() ).cast< const uint8_t >() );
+	}
+
+	/// Writes a string WITH its null terminator to the buffer.
+	void writeString0( const std::string & str );
+
+	BinaryOutputStream & operator<<( const_byte_span buffer )
+	{
+		writeBytes( buffer );
+		return *this;
+	}
+
+	BinaryOutputStream & operator<<( const std::string & str )
+	{
+		writeString0( str );
+		return *this;
+	}
+
+	/// Writes specified number of zero bytes to the buffer.
+	void writeZeros( size_t numZeroBytes );
+
+	/// Returns how much space is left in the output buffer.
+	size_t remaining() const noexcept { return size_t( _endPos - _curPos ); }
+
+ private:
+
+	void checkWrite( MAYBE_UNUSED size_t size, MAYBE_UNUSED const char * type )
+	{
+	 #ifdef SAFETY_CHECKS
+		if (_curPos + size > _endPos)
+		{
+			critical_error(
+				"Attempted to write %s of size %zu past the buffer end, remaining size: %zu", type, size, remaining()
+			);
+		}
+	 #endif
+	}
+
+	template< typename IntType, typename std::enable_if< std::is_integral<IntType>::value, int >::type = 0 >
+	void _writeIntBE( IntType native )
 	{
 		uint8_t * const bigEndian = _curPos;
 
@@ -78,7 +167,7 @@ class BinaryOutputStream
 
 	/** Converts an arbitrary integral number from native format to little endian and writes it into the buffer. */
 	template< typename IntType, typename std::enable_if< std::is_integral<IntType>::value, int >::type = 0 >
-	void writeIntLE( IntType native )
+	void _writeIntLE( IntType native )
 	{
 		uint8_t * const littleEndian = _curPos;
 
@@ -93,76 +182,36 @@ class BinaryOutputStream
 		_curPos += sizeof( IntType );
 	}
 
-	/** Converts an integer representation of an enum value from native format to big endian and writes it into the buffer. */
-	template< typename EnumType, typename std::enable_if< std::is_enum<EnumType>::value, int >::type = 0 >
-	void writeEnumBE( EnumType native )
-	{
-		writeIntBE( enumToInt( native ) );
-	}
-
-	/** Converts an integer representation of an enum value from native format to little endian and writes it into the buffer. */
-	template< typename EnumType, typename std::enable_if< std::is_enum<EnumType>::value, int >::type = 0 >
-	void writeEnumLE( EnumType native )
-	{
-		writeIntLE( enumToInt( native ) );
-	}
-
-	//-- strings and arrays --------------------------------------------------------------------------------------------
-
-	void writeBytes( const_byte_span buffer );
-
-	/** Writes a string WITHOUT its null terminator to the buffer. */
-	void writeString( const std::string & str )  { writeBytes( make_span( str ).cast< const uint8_t >() ); }
-
-	/** Writes a string WITH its null terminator to the buffer. */
-	void writeString0( const std::string & str );
-
-	BinaryOutputStream & operator<<( const_byte_span buffer )
-	{
-		writeBytes( buffer );
-		return *this;
-	}
-
-	/** Writes a string and its null terminator to the buffer. */
-	BinaryOutputStream & operator<<( const std::string & str )
-	{
-		writeString0( str );
-		return *this;
-	}
-
-	/** Writes specified number of zero bytes to the buffer. */
-	void writeZeros( size_t numZeroBytes );
-
-	//-- error handling ------------------------------------------------------------------------------------------------
-
-	//bool hasFailed() const { return _failed; }
+	void _writeBytes( const_byte_span buffer );
 
  private:
 
 	uint8_t * _curPos;  ///< current position in the buffer
 	uint8_t * _endPos;  ///< ending position in the buffer
-	//bool _failed = false;  ///< the end was reached while attemting to write into buffer
 
 };
 
 
 //======================================================================================================================
-/** binary buffer input stream allowing deserialization via operator >> */
+/// Binary buffer input stream allowing deserialization via operator>> .
+/** This is a binary alternative of std::istringstream. First you allocate a buffer, then you construct this stream
+  * object, and then you read the data you expect using operator>> or named methods, until hasFailed() is true. */
 
 class BinaryInputStream
 {
 
  public:
 
+	/// Initializes a binary input stream operating over any byte container with continuous memory.
 	/** WARNING: The class takes non-owning reference to a buffer stored somewhere else and doesn't remember anything
 	  * about its original type. You are responsible for making sure the buffer exists at least as long as this object. */
-	BinaryInputStream( const_byte_span buffer ) : _curPos( buffer.data() ), _endPos( buffer.data() + buffer.size() ) {}
+	BinaryInputStream( const_byte_span buffer ) noexcept : _curPos( &*buffer.begin() ), _endPos( &*buffer.end() ) {}
 
 	BinaryInputStream( const BinaryInputStream & other ) = delete;
 	BinaryInputStream( BinaryInputStream && other ) = delete;
 	BinaryInputStream & operator=( const BinaryInputStream & other ) = delete;
 
-	void reset( const_byte_span buffer )     { _curPos = buffer.data(); _endPos = buffer.data() + buffer.size(); }
+	void reset( const_byte_span buffer ) noexcept  { _curPos = &*buffer.begin(); _endPos = &*buffer.end(); }
 
 	//-- atomic elements -----------------------------------------------------------------------------------------------
 
@@ -350,15 +399,17 @@ class BinaryInputStream
 	/** Moves over specified number of bytes without returning them to the user. */
 	bool skip( size_t numBytes );
 
+	size_t remaining() const noexcept { return size_t( _endPos - _curPos ); }
+
 	//-- error handling ------------------------------------------------------------------------------------------------
 
-	void setFailed() { _failed = true; }
-	void resetFailed() { _failed = false; }
-	bool hasFailed() const { return _failed; }
+	void setFailed() noexcept { _failed = true; }
+	void resetFailed() noexcept { _failed = false; }
+	bool hasFailed() const noexcept { return _failed; }
 
  private:
 
-	bool canRead( size_t size )
+	bool canRead( size_t size ) noexcept
 	{
 		// the _failed flag can be true already from the previous call, in that case it will stay failed
 		_failed |= _curPos + size > _endPos;

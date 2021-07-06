@@ -21,7 +21,7 @@ namespace own {
 //----------------------------------------------------------------------------------------------------------------------
 //  strings and arrays
 
-void BinaryOutputStream::writeBytes( const_byte_span buffer )
+void BinaryOutputStream::_writeBytes( const_byte_span buffer )
 {
 	memcpy( _curPos, buffer.data(), buffer.size() );
 	_curPos += buffer.size();
@@ -29,8 +29,18 @@ void BinaryOutputStream::writeBytes( const_byte_span buffer )
 
 void BinaryOutputStream::writeString0( const string & str )
 {
+	checkWrite( str.size() + 1, "string" );
+
 	memcpy( _curPos, str.data(), str.size() + 1 );
 	_curPos += str.size() + 1;
+}
+
+void BinaryOutputStream::writeZeros( size_t numZeroBytes )
+{
+	checkWrite( numZeroBytes, "zeros" );
+
+	memset( _curPos, 0, numZeroBytes );
+	_curPos += numZeroBytes;
 }
 
 bool BinaryInputStream::readBytes( byte_span buffer )
@@ -71,12 +81,6 @@ bool BinaryInputStream::readString0( string & str )
 		}
 	}
 	return !_failed;
-}
-
-void BinaryOutputStream::writeZeros( size_t numZeroBytes )
-{
-	memset( _curPos, 0, numZeroBytes );
-	_curPos += numZeroBytes;
 }
 
 bool BinaryInputStream::readRemaining( std::vector< uint8_t > & buffer )

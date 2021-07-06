@@ -14,8 +14,7 @@
 #include "Span.hpp"
 
 #include <chrono>  // timeout
-#include <vector>  // send, recv
-#include <array>
+#include <vector>  // recv
 #include <cstring> // strlen
 
 struct sockaddr;
@@ -27,7 +26,7 @@ namespace own {
 //======================================================================================================================
 //  types shared between multiple socket classes
 
-/** our own unified error codes, because error codes from system calls vary from OS to OS */
+/// our own unified error codes, because error codes from system calls vary from OS to OS
 enum class SocketError
 {
 	Success = 0,                ///< The operation was successful.
@@ -46,8 +45,8 @@ enum class SocketError
 	WouldBlock = 32,            ///< Socket is set to non-blocking mode and there is no data in the system input buffer.
 	// errors related to opening a server
 	AlreadyOpen = 40,           ///< Opening server failed because the socket is already listening. Call close() first.
-	BindFailed = 41,            ///< TODO
-	ListenFailed = 42,          ///< TODO
+	BindFailed = 41,            ///< Failed to bind the socket to a specified network address and port. Call getLastSystemError() for more info.
+	ListenFailed = 42,          ///< Failed to switch the socket to a listening state. Call getLastSystemError() for more info.
 
 	Other = 255                 ///< Other system error. Call getLastSystemError() for more info.
 };
@@ -61,39 +60,41 @@ const char * enumString( SocketError error );
 
 
 //======================================================================================================================
-///  private implementation details
+/// private implementation details
 
 namespace impl {
 
-/** common for all socket classes */
+/// common for all socket classes
 class SocketCommon
 {
 
  public:
 
-	SocketError close();
-	bool isOpen() const;
+	SocketError close() noexcept;
+	bool isOpen() const noexcept;
 
-	system_error_t getLastSystemError() const   { return _lastSystemError; }
-	bool setBlockingMode( bool enable )         { _isBlocking = enable; return _setBlockingMode( _socket, enable ); }  // TODO
-	bool isBlocking() const                     { return _isBlocking; }
+	bool setBlockingMode( bool enable ) noexcept;
+	bool isBlocking() const noexcept  { return _isBlocking; }
+
+	system_error_t getLastSystemError() const noexcept  { return _lastSystemError; }
 
  protected:
 
-	SocketCommon();
-	SocketCommon( socket_t sock );
-	~SocketCommon();
+	SocketCommon() noexcept;
+	SocketCommon( socket_t sock ) noexcept;
+	~SocketCommon() noexcept;
 
 	SocketCommon( const SocketCommon & other ) = delete;
-	SocketCommon( SocketCommon && other );
-	SocketCommon & operator=( SocketCommon && other );
+	SocketCommon( SocketCommon && other ) noexcept;
+	SocketCommon & operator=( const SocketCommon & other ) = delete;
+	SocketCommon & operator=( SocketCommon && other ) noexcept;
 
-	static bool _shutdownSocket( socket_t sock );
-	static bool _closeSocket( socket_t sock );
-	static bool _setTimeout( socket_t sock, std::chrono::milliseconds timeout );
-	static bool _isTimeout( system_error_t errorCode );
-	static bool _isWouldBlock( system_error_t errorCode );
-	static bool _setBlockingMode( socket_t sock, bool enable );
+	static bool _shutdownSocket( socket_t sock ) noexcept;
+	static bool _closeSocket( socket_t sock ) noexcept;
+	static bool _setTimeout( socket_t sock, std::chrono::milliseconds timeout ) noexcept;
+	static bool _isTimeout( system_error_t errorCode ) noexcept;
+	static bool _isWouldBlock( system_error_t errorCode ) noexcept;
+	static bool _setBlockingMode( socket_t sock, bool enable ) noexcept;
 
  protected:
 
@@ -107,44 +108,58 @@ class SocketCommon
 
 
 //======================================================================================================================
-/** abstraction over low-level TCP socket system calls */
+/// Abstraction over low-level TCP socket system calls.
+/** This class is used either by a client connecting to a server
+  * or by a server after it accepts a connection from a client. */
 
 class TcpClientSocket : public impl::SocketCommon
 {
 
  public:
 
-	TcpClientSocket();
-	~TcpClientSocket();
+	TcpClientSocket() noexcept;
+	~TcpClientSocket() noexcept;
 
 	TcpClientSocket( const TcpClientSocket & other ) = delete;
-	TcpClientSocket( TcpClientSocket && other );
-	TcpClientSocket & operator=( TcpClientSocket && other );
+	TcpClientSocket( TcpClientSocket && other ) noexcept;
+	TcpClientSocket & operator=( const TcpClientSocket & other ) = delete;
+	TcpClientSocket & operator=( TcpClientSocket && other ) noexcept;
 
+	/// Connects to a specified endpoint determined by host name and port.
+	/** First the host name is resolved to an IP address and then a connection to that address is established. */
 	SocketError connect( const std::string & host, uint16_t port );
+
+	/// Connects to a specified endpoint determined by IP address and port.
 	SocketError connect( const IPAddr & addr, uint16_t port );
-	SocketError disconnect();
-	bool isConnected() const;
 
-	/** This needs to be checked after TcpServerSocket::accept() */
-	bool isValid() const;
+	/// Disconnects from the currently connected server.
+	SocketError disconnect() noexcept;
 
-	bool setTimeout( std::chrono::milliseconds timeout );
+	bool isConnected() const noexcept;
 
-	/** Sends given number of bytes to the socket. If the system does not accept that amount of data all at once,
+	/// This needs to be checked after TcpServerSocket::accept()
+	bool isValid() const noexcept;
+
+	/// Sets the timeout for further receive operations.
+	bool setTimeout( std::chrono::milliseconds timeout ) noexcept;
+
+	/// Sends given number of bytes to the socket.
+	/** If the system does not accept that amount of data all at once,
 	  * it repeats the system calls until all requested data are sent. */
 	SocketError send( const_byte_span buffer );
 
-	/** Receive the given number of bytes from the socket. If the requested amount of data don't arrive all at once,
+	/// Receive the given number of bytes from the socket.
+	/** If the requested amount of data don't arrive all at once,
 	  * it repeats the system calls until all requested data are received.
 	  * The number of bytes actually received is stored in an output parameter.
-	  * @param[out] received - how many bytes were really received */
+	  * @param[out] received how many bytes were really received */
 	SocketError receive( byte_span buffer, size_t & received );
 
-	/** Receive the given number of bytes from the socket. If the requested amount of data don't arrive all at once,
+	/// Receive the given number of bytes from the socket.
+	/** If the requested amount of data don't arrive all at once,
 	  * it repeats the system calls until all requested data are received.
 	  * After the call, the size of the vector will be equal to the number of bytes actually received.
-	  * @param[in] size - how many bytes to receive */
+	  * @param[in] size how many bytes to receive */
 	SocketError receive( std::vector< uint8_t > & buffer, size_t size )
 	{
 		buffer.resize( size );  // allocate the needed storage
@@ -158,7 +173,7 @@ class TcpClientSocket : public impl::SocketCommon
 
 	 // allow creating socket object from already initialized socket handle, but only for TcpServerSocket
 	 friend class TcpServerSocket;
-	 TcpClientSocket( socket_t sock ) : SocketCommon( sock ) {}
+	 TcpClientSocket( socket_t sock ) noexcept : SocketCommon( sock ) {}
 
 	 SocketError _connect( int family, int addrlen, struct sockaddr * addr );
 
@@ -166,50 +181,54 @@ class TcpClientSocket : public impl::SocketCommon
 
 
 //======================================================================================================================
-/** abstraction over low-level TCP socket system calls */
+/// Abstraction over low-level TCP server socket system calls.
+/** This class is used by a server to listen to incomming connections. */
 
 class TcpServerSocket : public impl::SocketCommon
 {
 
  public:
 
-	TcpServerSocket();
-	~TcpServerSocket();
+	TcpServerSocket() noexcept;
+	~TcpServerSocket() noexcept;
 
 	TcpServerSocket( const TcpServerSocket & other ) = delete;
-	TcpServerSocket( TcpServerSocket && other );
-	TcpServerSocket & operator=( TcpServerSocket && other );
+	TcpServerSocket( TcpServerSocket && other ) noexcept;
+	TcpServerSocket & operator=( const TcpServerSocket & other ) = delete;
+	TcpServerSocket & operator=( TcpServerSocket && other ) noexcept;
 
-	/** Opens a TCP server on selected port. */
+	/// Opens a TCP server on selected port.
 	SocketError open( uint16_t port );
 
+	/// Waits for an incomming connection request and then returns a socket representing the established connection.
 	TcpClientSocket accept();
 
 };
 
 
 //======================================================================================================================
-/** abstraction over low-level UDP socket system calls */
+/// Abstraction over low-level UDP socket system calls.
 
 class UdpSocket : public impl::SocketCommon
 {
 
  public:
 
-	UdpSocket();
-	~UdpSocket();
+	UdpSocket() noexcept;
+	~UdpSocket() noexcept;
 
 	UdpSocket( const UdpSocket & other ) = delete;
-	UdpSocket( UdpSocket && other );
-	UdpSocket & operator=( UdpSocket && other );
+	UdpSocket( UdpSocket && other ) noexcept;
+	UdpSocket & operator=( const UdpSocket & other ) = delete;
+	UdpSocket & operator=( UdpSocket && other ) noexcept;
 
-	/** Opens an UDP socket on selected port. */
+	/// Opens an UDP socket on selected port.
 	SocketError open( uint16_t port = 0 );
 
-	/** TODO */
+	/// Sends a datagram to a specified address and port.
 	SocketError sendTo( const Endpoint & endpoint, const_byte_span buffer );
 
-	/** TODO */
+	/// Waits for an incomming datagram and returns the packet data and the address and port it came from.
 	SocketError recvFrom( Endpoint & endpoint, byte_span buffer, size_t & received );
 
 };
