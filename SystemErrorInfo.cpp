@@ -29,7 +29,7 @@ system_error_t getLastError() noexcept
  #endif // _WIN32
 }
 
-std::string getErrorString( system_error_t errorCode )
+std::string getErrorString( system_error_t errorCode ) noexcept
 {
 	char outStr [256];
  #ifdef _WIN32

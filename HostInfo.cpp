@@ -40,7 +40,10 @@ AddrResult getAddrByHostname( const std::string & hostName )
 	{
 		result.error = 0;
 		Endpoint endpoint;
-		sockaddrToEndpoint( ainfo->ai_addr, endpoint );
+		if (!sockaddrToEndpoint( ainfo->ai_addr, endpoint ))
+		{
+			critical_error( "Socket operation returned unexpected address family." );
+		}
 		result.addr = endpoint.addr;
 	}
 

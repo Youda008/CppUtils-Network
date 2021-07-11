@@ -221,7 +221,7 @@ class IPv4Addr : public GenericAddr<4>
 	}
 
 	friend std::ostream & operator<<( std::ostream & os, IPv4Addr addr );
-	friend std::istream & operator>>( std::istream & is, IPv4Addr & addr );
+	friend std::istream & operator>>( std::istream & is, IPv4Addr & addr ) noexcept;
 };
 
 
@@ -273,7 +273,7 @@ class IPv6Addr : public GenericAddr<16>
 	}
 
 	friend std::ostream & operator<<( std::ostream & os, const IPv6Addr & addr );
-	friend std::istream & operator>>( std::istream & is, IPv6Addr & addr );
+	friend std::istream & operator>>( std::istream & is, IPv6Addr & addr ) noexcept;
 };
 
 
@@ -328,7 +328,7 @@ class IPAddr : public GenericAddr<16>
 	}
 
 	friend std::ostream & operator<<( std::ostream & os, const IPAddr & addr );
-	friend std::istream & operator>>( std::istream & is, IPAddr & addr );
+	friend std::istream & operator>>( std::istream & is, IPAddr & addr ) noexcept;
 };
 
 
@@ -342,7 +342,7 @@ class MACAddr : public GenericAddr<6>
 	using GenericAddr<6>::GenericAddr;
 
 	friend std::ostream & operator<<( std::ostream & os, const MACAddr & addr );
-	friend std::istream & operator>>( std::istream & is, MACAddr & addr );
+	friend std::istream & operator>>( std::istream & is, MACAddr & addr ) noexcept;
 };
 
 
@@ -354,9 +354,9 @@ struct Endpoint
 	uint16_t port;
 };
 
-void endpointToSockaddr( const Endpoint & ep, struct sockaddr * saddr, int & addrlen );
+void endpointToSockaddr( const Endpoint & ep, struct sockaddr * saddr, int & addrlen ) noexcept;
 
-void sockaddrToEndpoint( const struct sockaddr * saddr, Endpoint & ep );
+bool sockaddrToEndpoint( const struct sockaddr * saddr, Endpoint & ep ) noexcept;
 
 
 //======================================================================================================================

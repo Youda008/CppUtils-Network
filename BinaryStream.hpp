@@ -195,7 +195,9 @@ class BinaryOutputStream
 //======================================================================================================================
 /// Binary buffer input stream allowing deserialization via operator>> .
 /** This is a binary alternative of std::istringstream. First you allocate a buffer, then you construct this stream
-  * object, and then you read the data you expect using operator>> or named methods, until hasFailed() is true. */
+  * object, and then you read the data you expect using operator>> or named methods.
+  * If an attempt to read past the end of the input buffer is made, the stream sets its internal error flag
+  * and returns default values for any further read operations. The error flag can be checked with hasFailed(). */
 
 class BinaryInputStream
 {
@@ -215,7 +217,7 @@ class BinaryInputStream
 
 	//-- atomic elements -----------------------------------------------------------------------------------------------
 
-	uint8_t get()
+	uint8_t get() noexcept
 	{
 		if (canRead( 1 )) {
 			return *(_curPos++);
@@ -224,18 +226,18 @@ class BinaryInputStream
 		}
 	}
 
-	char getChar()
+	char getChar() noexcept
 	{
 		return char( get() );
 	}
 
-	BinaryInputStream & operator>>( uint8_t & b )
+	BinaryInputStream & operator>>( uint8_t & b ) noexcept
 	{
 		b = get();
 		return *this;
 	}
 
-	BinaryInputStream & operator>>( char & b )
+	BinaryInputStream & operator>>( char & b ) noexcept
 	{
 		b = getChar();
 		return *this;
@@ -246,7 +248,7 @@ class BinaryInputStream
 	/** Reads an arbitrary integral number from the buffer and converts it from big endian to native format.
 	  * (return value variant) */
 	template< typename IntType, typename std::enable_if< std::is_integral<IntType>::value, int >::type = 0 >
-	IntType readIntBE()
+	IntType readIntBE() noexcept
 	{
 		IntType native = 0;
 
@@ -272,7 +274,7 @@ class BinaryInputStream
 	/** Reads an arbitrary integral number from the buffer and converts it from big endian to native format.
 	  * (output parameter variant) */
 	template< typename IntType, typename std::enable_if< std::is_integral<IntType>::value, int >::type = 0 >
-	bool readIntBE( IntType & native )
+	bool readIntBE( IntType & native ) noexcept
 	{
 		native = readIntBE< IntType >();
 		return !_failed;
@@ -281,7 +283,7 @@ class BinaryInputStream
 	/** Reads an arbitrary integral number from the buffer and converts it from little endian to native format.
 	  * (return value variant) */
 	template< typename IntType, typename std::enable_if< std::is_integral<IntType>::value, int >::type = 0 >
-	IntType readIntLE()
+	IntType readIntLE() noexcept
 	{
 		IntType native = 0;
 
@@ -307,7 +309,7 @@ class BinaryInputStream
 	/** Reads an arbitrary integral number from the buffer and converts it from little endian to native format.
 	  * (output parameter variant) */
 	template< typename IntType, typename std::enable_if< std::is_integral<IntType>::value, int >::type = 0 >
-	bool readIntLE( IntType & native )
+	bool readIntLE( IntType & native ) noexcept
 	{
 		native = readIntLE< IntType >();
 		return !_failed;
@@ -316,7 +318,7 @@ class BinaryInputStream
 	/** Reads an integer representation of an enum value from the buffer and converts it from big endian to native format.
 	  * (return value variant) */
 	template< typename EnumType, typename std::enable_if< std::is_enum<EnumType>::value, int >::type = 0 >
-	EnumType readEnumBE()
+	EnumType readEnumBE() noexcept
 	{
 		return EnumType( readIntBE< typename std::underlying_type< EnumType >::type >() );
 	}
@@ -324,7 +326,7 @@ class BinaryInputStream
 	/** Reads an integer representation of an enum value from the buffer and converts it from big endian to native format.
 	  * (output parameter variant) */
 	template< typename EnumType, typename std::enable_if< std::is_enum<EnumType>::value, int >::type = 0 >
-	bool readEnumBE( EnumType & native )
+	bool readEnumBE( EnumType & native ) noexcept
 	{
 		native = readEnumBE< EnumType >();
 		return !_failed;
@@ -333,7 +335,7 @@ class BinaryInputStream
 	/** Reads an integer representation of an enum value from the buffer and converts it from little endian to native format.
 	  * (return value variant) */
 	template< typename EnumType, typename std::enable_if< std::is_enum<EnumType>::value, int >::type = 0 >
-	EnumType readEnumLE()
+	EnumType readEnumLE() noexcept
 	{
 		return EnumType( readIntLE< typename std::underlying_type< EnumType >::type >() );
 	}
@@ -341,7 +343,7 @@ class BinaryInputStream
 	/** Reads an integer representation of an enum value from the buffer and converts it from little endian to native format.
 	  * (output parameter variant) */
 	template< typename EnumType, typename std::enable_if< std::is_enum<EnumType>::value, int >::type = 0 >
-	bool readEnumLE( EnumType & native )
+	bool readEnumLE( EnumType & native ) noexcept
 	{
 		native = readEnumLE< EnumType >();
 		return !_failed;
@@ -349,15 +351,15 @@ class BinaryInputStream
 
 	//-- strings and arrays --------------------------------------------------------------------------------------------
 
-	bool readBytes( byte_span buffer );
+	bool readBytes( byte_span buffer ) noexcept;
 
 	/** Reads a string of specified size from the buffer.
 	  * (output parameter variant) */
-	bool readString( std::string & str, size_t size );
+	bool readString( std::string & str, size_t size ) noexcept;
 
 	/** Reads a string of specified size from the buffer.
 	  * (return value variant) */
-	std::string readString( size_t size )
+	std::string readString( size_t size ) noexcept
 	{
 		std::string str;
 		readString( str, size );
@@ -366,38 +368,38 @@ class BinaryInputStream
 
 	/** Reads a string from the buffer until a null terminator is found.
 	  * (output parameter variant) */
-	bool readString0( std::string & str );
+	bool readString0( std::string & str ) noexcept;
 
 	/** Reads a string from the buffer until a null terminator is found.
 	  * (return value variant) */
-	std::string readString0()
+	std::string readString0() noexcept
 	{
 		std::string str;
 		readString0( str );
 		return str;
 	}
 
-	BinaryInputStream & operator>>( byte_span buffer )
+	BinaryInputStream & operator>>( byte_span buffer ) noexcept
 	{
 		readBytes( buffer );
 		return *this;
 	}
 
 	/** Reads a string from the buffer until a null terminator is found. */
-	BinaryInputStream & operator>>( std::string & str )
+	BinaryInputStream & operator>>( std::string & str ) noexcept
 	{
 		readString0( str );
 		return *this;
 	}
 
 	/** Reads the remaining data from the current position until the end of the buffer to a vector. */
-	bool readRemaining( std::vector< uint8_t > & buffer );
+	bool readRemaining( std::vector< uint8_t > & buffer ) noexcept;
 
 	/** Reads the remaining data from the current position until the end of the buffer to a string. */
-	bool readRemaining( std::string & str );
+	bool readRemaining( std::string & str ) noexcept;
 
 	/** Moves over specified number of bytes without returning them to the user. */
-	bool skip( size_t numBytes );
+	bool skip( size_t numBytes ) noexcept;
 
 	size_t remaining() const noexcept { return size_t( _endPos - _curPos ); }
 

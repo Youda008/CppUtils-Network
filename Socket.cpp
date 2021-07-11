@@ -40,7 +40,7 @@ namespace own {
 //======================================================================================================================
 //  error strings
 
-const char * enumString( SocketError error )
+const char * enumString( SocketError error ) noexcept
 {
 	switch (error)
 	{
@@ -72,9 +72,9 @@ class NetworkingSubsystem
 
  public:
 
-	NetworkingSubsystem() : _initialized( false ) {}
+	NetworkingSubsystem() noexcept : _initialized( false ) {}
 
-	bool initializeIfNotAlready()
+	bool initializeIfNotAlready() noexcept
 	{
 		// this additional check is optimization for cases where it's already initialized, which is gonna be the majority
 		if (_initialized)
@@ -89,7 +89,7 @@ class NetworkingSubsystem
 		return _initialized;
 	}
 
-	~NetworkingSubsystem()
+	~NetworkingSubsystem() noexcept
 	{
 		if (_initialized)
 		{
@@ -99,7 +99,7 @@ class NetworkingSubsystem
 
  private:
 
-	bool _initialize()
+	bool _initialize() noexcept
 	{
  #ifdef _WIN32
 		return WSAStartup( MAKEWORD(2, 2), &_wsaData ) == NO_ERROR;
@@ -108,7 +108,7 @@ class NetworkingSubsystem
  #endif // _WIN32
 	}
 
-	void _terminate()
+	void _terminate() noexcept
 	{
  #ifdef _WIN32
 		WSACleanup();
@@ -308,7 +308,7 @@ TcpClientSocket & TcpClientSocket::operator=( TcpClientSocket && other ) noexcep
 	return static_cast< TcpClientSocket & >( impl::SocketCommon::operator=( move( other ) ) );
 }
 
-SocketError TcpClientSocket::connect( const std::string & host, uint16_t port )
+SocketError TcpClientSocket::connect( const std::string & host, uint16_t port ) noexcept
 {
 	if (_socket != INVALID_SOCK)
 	{
@@ -342,7 +342,7 @@ SocketError TcpClientSocket::connect( const std::string & host, uint16_t port )
 	return _connect( ainfo->ai_family, (int)ainfo->ai_addrlen, ainfo->ai_addr );
 }
 
-SocketError TcpClientSocket::connect( const IPAddr & addr, uint16_t port )
+SocketError TcpClientSocket::connect( const IPAddr & addr, uint16_t port ) noexcept
 {
 	if (_socket != INVALID_SOCK)
 	{
@@ -362,7 +362,7 @@ SocketError TcpClientSocket::connect( const IPAddr & addr, uint16_t port )
 	return _connect( saddr.ss_family, addrlen, (struct sockaddr *)&saddr );
 }
 
-SocketError TcpClientSocket::_connect( int family, int addrlen, struct sockaddr * addr )
+SocketError TcpClientSocket::_connect( int family, int addrlen, struct sockaddr * addr ) noexcept
 {
 	// create a corresponding socket
 	_socket = ::socket( family, SOCK_STREAM, 0 );
@@ -406,7 +406,7 @@ bool TcpClientSocket::setTimeout( std::chrono::milliseconds timeout ) noexcept
 	return success;
 }
 
-SocketError TcpClientSocket::send( const_byte_span buffer )
+SocketError TcpClientSocket::send( const_byte_span buffer ) noexcept
 {
 	if (_socket == INVALID_SOCK)
 	{
@@ -431,7 +431,7 @@ SocketError TcpClientSocket::send( const_byte_span buffer )
 	return SocketError::Success;
 }
 
-SocketError TcpClientSocket::receive( byte_span buffer, size_t & totalReceived )
+SocketError TcpClientSocket::receive( byte_span buffer, size_t & totalReceived ) noexcept
 {
 	if (_socket == INVALID_SOCK)
 	{
@@ -493,7 +493,7 @@ TcpServerSocket & TcpServerSocket::operator=( TcpServerSocket && other ) noexcep
 	return static_cast< TcpServerSocket & >( impl::SocketCommon::operator=( move( other ) ) );
 }
 
-SocketError TcpServerSocket::open( uint16_t port )
+SocketError TcpServerSocket::open( uint16_t port ) noexcept
 {
 	if (_socket != INVALID_SOCK)
 	{
@@ -544,7 +544,7 @@ SocketError TcpServerSocket::open( uint16_t port )
 	return SocketError::Success;
 }
 
-TcpClientSocket TcpServerSocket::accept()
+TcpClientSocket TcpServerSocket::accept() noexcept
 {
 	if (_socket == INVALID_SOCK)
 	{
@@ -584,7 +584,7 @@ UdpSocket & UdpSocket::operator=( UdpSocket && other ) noexcept
 	return static_cast< UdpSocket & >( impl::SocketCommon::operator=( move( other ) ) );
 }
 
-SocketError UdpSocket::open( uint16_t port )
+SocketError UdpSocket::open( uint16_t port ) noexcept
 {
 	if (_socket != INVALID_SOCK)
 	{
@@ -668,7 +668,10 @@ SocketError UdpSocket::recvFrom( Endpoint & endpoint, byte_span buffer, size_t &
 		}
 	}
 
-	sockaddrToEndpoint( (struct sockaddr *)&saddr, endpoint );
+	if (!sockaddrToEndpoint( (struct sockaddr *)&saddr, endpoint ))
+	{
+		critical_error( "Socket operation returned unexpected address family." );
+	}
 
 	totalReceived = size_t( received );
 	_lastSystemError = getLastError();

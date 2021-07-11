@@ -43,7 +43,7 @@ void BinaryOutputStream::writeZeros( size_t numZeroBytes )
 	_curPos += numZeroBytes;
 }
 
-bool BinaryInputStream::readBytes( byte_span buffer )
+bool BinaryInputStream::readBytes( byte_span buffer ) noexcept
 {
 	if (!canRead( buffer.size() )) {
 		return false;
@@ -54,7 +54,7 @@ bool BinaryInputStream::readBytes( byte_span buffer )
 	return true;
 }
 
-bool BinaryInputStream::readString( string & str, size_t size )
+bool BinaryInputStream::readString( string & str, size_t size ) noexcept
 {
 	if (!canRead( size )) {
 		return false;
@@ -66,7 +66,7 @@ bool BinaryInputStream::readString( string & str, size_t size )
 	return true;
 }
 
-bool BinaryInputStream::readString0( string & str )
+bool BinaryInputStream::readString0( string & str ) noexcept
 {
 	if (!_failed)
 	{
@@ -83,7 +83,7 @@ bool BinaryInputStream::readString0( string & str )
 	return !_failed;
 }
 
-bool BinaryInputStream::readRemaining( std::vector< uint8_t > & buffer )
+bool BinaryInputStream::readRemaining( std::vector< uint8_t > & buffer ) noexcept
 {
 	const size_t size = size_t( _endPos - _curPos );
 	buffer.resize( size );
@@ -92,7 +92,7 @@ bool BinaryInputStream::readRemaining( std::vector< uint8_t > & buffer )
 	return true;
 }
 
-bool BinaryInputStream::readRemaining( std::string & str )
+bool BinaryInputStream::readRemaining( std::string & str ) noexcept
 {
 	const size_t size = size_t( _endPos - _curPos );
 	str.resize( size, '0' );
@@ -101,7 +101,7 @@ bool BinaryInputStream::readRemaining( std::string & str )
 	return true;
 }
 
-bool BinaryInputStream::skip( size_t numBytes )
+bool BinaryInputStream::skip( size_t numBytes ) noexcept
 {
 	if (!canRead( numBytes )) {
 		return false;

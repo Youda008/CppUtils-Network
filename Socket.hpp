@@ -50,7 +50,7 @@ enum class SocketError
 
 	Other = 255                 ///< Other system error. Call getLastSystemError() for more info.
 };
-const char * enumString( SocketError error );
+const char * enumString( SocketError error ) noexcept;
 
 #ifdef _WIN32
 	using socket_t = uintptr_t;  // should be SOCKET but let's not include the whole big winsock2.h just because of this
@@ -127,10 +127,10 @@ class TcpClientSocket : public impl::SocketCommon
 
 	/// Connects to a specified endpoint determined by host name and port.
 	/** First the host name is resolved to an IP address and then a connection to that address is established. */
-	SocketError connect( const std::string & host, uint16_t port );
+	SocketError connect( const std::string & host, uint16_t port ) noexcept;
 
 	/// Connects to a specified endpoint determined by IP address and port.
-	SocketError connect( const IPAddr & addr, uint16_t port );
+	SocketError connect( const IPAddr & addr, uint16_t port ) noexcept;
 
 	/// Disconnects from the currently connected server.
 	SocketError disconnect() noexcept;
@@ -146,21 +146,21 @@ class TcpClientSocket : public impl::SocketCommon
 	/// Sends given number of bytes to the socket.
 	/** If the system does not accept that amount of data all at once,
 	  * it repeats the system calls until all requested data are sent. */
-	SocketError send( const_byte_span buffer );
+	SocketError send( const_byte_span buffer ) noexcept;
 
 	/// Receive the given number of bytes from the socket.
 	/** If the requested amount of data don't arrive all at once,
 	  * it repeats the system calls until all requested data are received.
 	  * The number of bytes actually received is stored in an output parameter.
 	  * @param[out] received how many bytes were really received */
-	SocketError receive( byte_span buffer, size_t & received );
+	SocketError receive( byte_span buffer, size_t & received ) noexcept;
 
 	/// Receive the given number of bytes from the socket.
 	/** If the requested amount of data don't arrive all at once,
 	  * it repeats the system calls until all requested data are received.
 	  * After the call, the size of the vector will be equal to the number of bytes actually received.
 	  * @param[in] size how many bytes to receive */
-	SocketError receive( std::vector< uint8_t > & buffer, size_t size )
+	SocketError receive( std::vector< uint8_t > & buffer, size_t size ) noexcept
 	{
 		buffer.resize( size );  // allocate the needed storage
 		size_t received;
@@ -175,7 +175,7 @@ class TcpClientSocket : public impl::SocketCommon
 	 friend class TcpServerSocket;
 	 TcpClientSocket( socket_t sock ) noexcept : SocketCommon( sock ) {}
 
-	 SocketError _connect( int family, int addrlen, struct sockaddr * addr );
+	 SocketError _connect( int family, int addrlen, struct sockaddr * addr ) noexcept;
 
 };
 
@@ -198,10 +198,10 @@ class TcpServerSocket : public impl::SocketCommon
 	TcpServerSocket & operator=( TcpServerSocket && other ) noexcept;
 
 	/// Opens a TCP server on selected port.
-	SocketError open( uint16_t port );
+	SocketError open( uint16_t port ) noexcept;
 
 	/// Waits for an incomming connection request and then returns a socket representing the established connection.
-	TcpClientSocket accept();
+	TcpClientSocket accept() noexcept;
 
 };
 
@@ -223,7 +223,7 @@ class UdpSocket : public impl::SocketCommon
 	UdpSocket & operator=( UdpSocket && other ) noexcept;
 
 	/// Opens an UDP socket on selected port.
-	SocketError open( uint16_t port = 0 );
+	SocketError open( uint16_t port = 0 ) noexcept;
 
 	/// Sends a datagram to a specified address and port.
 	SocketError sendTo( const Endpoint & endpoint, const_byte_span buffer );

@@ -68,7 +68,7 @@ static std::ostream & ipv6ToStream( std::ostream & os, const uint8_t * bytes )
 	return os;
 }
 
-static std::istream & ipv4FromStream( std::istream & is, uint8_t * bytes )
+static std::istream & ipv4FromStream( std::istream & is, uint8_t * bytes ) noexcept
 {
 	std::string ipStr;
 	if (!(is >> ipStr))
@@ -80,7 +80,7 @@ static std::istream & ipv4FromStream( std::istream & is, uint8_t * bytes )
 	return is;
 }
 
-static std::istream & ipv6FromStream( std::istream & is, uint8_t * bytes )
+static std::istream & ipv6FromStream( std::istream & is, uint8_t * bytes ) noexcept
 {
 	std::string ipStr;
 	if (!(is >> ipStr))
@@ -92,7 +92,7 @@ static std::istream & ipv6FromStream( std::istream & is, uint8_t * bytes )
 	return is;
 }
 
-static IPVer ipAnyFromStream( std::istream & is, uint8_t * bytes )
+static IPVer ipAnyFromStream( std::istream & is, uint8_t * bytes ) noexcept
 {
 	std::string ipStr;
 	if (!(is >> ipStr))
@@ -127,7 +127,7 @@ std::ostream & operator<<( std::ostream & os, IPv4Addr addr )
 	return impl::ipv4ToStream( os, addr.data().data() );
 }
 
-std::istream & operator>>( std::istream & is, IPv4Addr & addr )
+std::istream & operator>>( std::istream & is, IPv4Addr & addr ) noexcept
 {
 	return impl::ipv4FromStream( is, addr.data().data() );
 }
@@ -141,7 +141,7 @@ std::ostream & operator<<( std::ostream & os, const IPv6Addr & addr )
 	return impl::ipv6ToStream( os, addr.data().data() );
 }
 
-std::istream & operator>>( std::istream & is, IPv6Addr & addr )
+std::istream & operator>>( std::istream & is, IPv6Addr & addr ) noexcept
 {
 	return impl::ipv6FromStream( is, addr.data().data() );
 }
@@ -200,7 +200,7 @@ std::ostream & operator<<( std::ostream & os, const IPAddr & addr )
 		critical_error( "Attempted to print uninitialized IPAddr." );
 }
 
-std::istream & operator>>( std::istream & is, IPAddr & addr )
+std::istream & operator>>( std::istream & is, IPAddr & addr ) noexcept
 {
 	addr._version = impl::ipAnyFromStream( is, addr.data().data() );
 	return is;
@@ -214,7 +214,7 @@ std::ostream & operator<<( std::ostream & /*os*/, const MACAddr & /*addr*/ )
 	TODO
 }
 
-std::istream & operator>>( std::istream & /*os*/, MACAddr & /*addr*/ )
+std::istream & operator>>( std::istream & /*os*/, MACAddr & /*addr*/ ) noexcept
 {
 	TODO
 }
@@ -223,7 +223,7 @@ std::istream & operator>>( std::istream & /*os*/, MACAddr & /*addr*/ )
 //======================================================================================================================
 //  Endpoint utils
 
-void endpointToSockaddr( const Endpoint & ep, struct sockaddr * saddr, int & addrlen )
+void endpointToSockaddr( const Endpoint & ep, struct sockaddr * saddr, int & addrlen ) noexcept
 {
 	memset( saddr, 0, sizeof(*saddr) );
 	if (ep.addr.version() == IPVer::_4)
@@ -248,23 +248,25 @@ void endpointToSockaddr( const Endpoint & ep, struct sockaddr * saddr, int & add
 	}
 }
 
-void sockaddrToEndpoint( const struct sockaddr * saddr, Endpoint & ep )
+bool sockaddrToEndpoint( const struct sockaddr * saddr, Endpoint & ep ) noexcept
 {
 	if (saddr->sa_family == AF_INET)
 	{
 		auto saddr4 = reinterpret_cast< const struct sockaddr_in * >( saddr );
 		impl::sysAddrToOwnAddrV4( &saddr4->sin_addr, ep.addr.data().data() );
 		ep.port = ntohs( saddr4->sin_port );
+		return true;
 	}
 	else if (saddr->sa_family == AF_INET6)
 	{
 		auto saddr6 = reinterpret_cast< const struct sockaddr_in6 * >( saddr );
 		impl::sysAddrToOwnAddrV6( &saddr6->sin6_addr, ep.addr.data().data() );
 		ep.port = ntohs( saddr6->sin6_port );
+		return true;
 	}
 	else
 	{
-		critical_error( "Socket operation returned unexpected address family." );
+		return false;
 	}
 }
 
