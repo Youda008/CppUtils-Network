@@ -112,18 +112,18 @@ class SocketCommon
 /** This class is used either by a client connecting to a server
   * or by a server after it accepts a connection from a client. */
 
-class TcpClientSocket : public impl::SocketCommon
+class TcpSocket : public impl::SocketCommon
 {
 
  public:
 
-	TcpClientSocket() noexcept;
-	~TcpClientSocket() noexcept;
+	TcpSocket() noexcept;
+	~TcpSocket() noexcept;
 
-	TcpClientSocket( const TcpClientSocket & other ) = delete;
-	TcpClientSocket( TcpClientSocket && other ) noexcept;
-	TcpClientSocket & operator=( const TcpClientSocket & other ) = delete;
-	TcpClientSocket & operator=( TcpClientSocket && other ) noexcept;
+	TcpSocket( const TcpSocket & other ) = delete;
+	TcpSocket( TcpSocket && other ) noexcept;
+	TcpSocket & operator=( const TcpSocket & other ) = delete;
+	TcpSocket & operator=( TcpSocket && other ) noexcept;
 
 	/// Connects to a specified endpoint determined by host name and port.
 	/** First the host name is resolved to an IP address and then a connection to that address is established. */
@@ -173,7 +173,7 @@ class TcpClientSocket : public impl::SocketCommon
 
 	 // allow creating socket object from already initialized socket handle, but only for TcpServerSocket
 	 friend class TcpServerSocket;
-	 TcpClientSocket( socket_t sock ) noexcept : SocketCommon( sock ) {}
+	 TcpSocket( socket_t sock ) noexcept : SocketCommon( sock ) {}
 
 	 SocketError _connect( int family, int addrlen, struct sockaddr * addr ) noexcept;
 
@@ -201,7 +201,7 @@ class TcpServerSocket : public impl::SocketCommon
 	SocketError open( uint16_t port ) noexcept;
 
 	/// Waits for an incomming connection request and then returns a socket representing the established connection.
-	TcpClientSocket accept() noexcept;
+	TcpSocket accept() noexcept;
 
 };
 

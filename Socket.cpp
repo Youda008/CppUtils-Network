@@ -294,21 +294,21 @@ bool SocketCommon::_setBlockingMode( socket_t sock, bool enable ) noexcept
 //======================================================================================================================
 //  TcpSocket
 
-TcpClientSocket::TcpClientSocket() noexcept : impl::SocketCommon() {}
+TcpSocket::TcpSocket() noexcept : impl::SocketCommon() {}
 
-TcpClientSocket::~TcpClientSocket() noexcept {}  // delegate to SocketCommon
+TcpSocket::~TcpSocket() noexcept {}  // delegate to SocketCommon
 
-TcpClientSocket::TcpClientSocket( TcpClientSocket && other ) noexcept
+TcpSocket::TcpSocket( TcpSocket && other ) noexcept
 {
 	*this = move( other );
 }
 
-TcpClientSocket & TcpClientSocket::operator=( TcpClientSocket && other ) noexcept
+TcpSocket & TcpSocket::operator=( TcpSocket && other ) noexcept
 {
-	return static_cast< TcpClientSocket & >( impl::SocketCommon::operator=( move( other ) ) );
+	return static_cast< TcpSocket & >( impl::SocketCommon::operator=( move( other ) ) );
 }
 
-SocketError TcpClientSocket::connect( const std::string & host, uint16_t port ) noexcept
+SocketError TcpSocket::connect( const std::string & host, uint16_t port ) noexcept
 {
 	if (_socket != INVALID_SOCK)
 	{
@@ -342,7 +342,7 @@ SocketError TcpClientSocket::connect( const std::string & host, uint16_t port ) 
 	return _connect( ainfo->ai_family, (int)ainfo->ai_addrlen, ainfo->ai_addr );
 }
 
-SocketError TcpClientSocket::connect( const IPAddr & addr, uint16_t port ) noexcept
+SocketError TcpSocket::connect( const IPAddr & addr, uint16_t port ) noexcept
 {
 	if (_socket != INVALID_SOCK)
 	{
@@ -362,7 +362,7 @@ SocketError TcpClientSocket::connect( const IPAddr & addr, uint16_t port ) noexc
 	return _connect( saddr.ss_family, addrlen, (struct sockaddr *)&saddr );
 }
 
-SocketError TcpClientSocket::_connect( int family, int addrlen, struct sockaddr * addr ) noexcept
+SocketError TcpSocket::_connect( int family, int addrlen, struct sockaddr * addr ) noexcept
 {
 	// create a corresponding socket
 	_socket = ::socket( family, SOCK_STREAM, 0 );
@@ -384,29 +384,29 @@ SocketError TcpClientSocket::_connect( int family, int addrlen, struct sockaddr 
 	return SocketError::Success;
 }
 
-SocketError TcpClientSocket::disconnect() noexcept
+SocketError TcpSocket::disconnect() noexcept
 {
 	return impl::SocketCommon::close();
 }
 
-bool TcpClientSocket::isConnected() const noexcept
+bool TcpSocket::isConnected() const noexcept
 {
 	return impl::SocketCommon::isOpen();
 }
 
-bool TcpClientSocket::isValid() const noexcept
+bool TcpSocket::isValid() const noexcept
 {
 	return _socket != INVALID_SOCK;
 }
 
-bool TcpClientSocket::setTimeout( std::chrono::milliseconds timeout ) noexcept
+bool TcpSocket::setTimeout( std::chrono::milliseconds timeout ) noexcept
 {
 	bool success = _setTimeout( _socket, timeout );
 	_lastSystemError = getLastError();
 	return success;
 }
 
-SocketError TcpClientSocket::send( const_byte_span buffer ) noexcept
+SocketError TcpSocket::send( const_byte_span buffer ) noexcept
 {
 	if (_socket == INVALID_SOCK)
 	{
@@ -431,7 +431,7 @@ SocketError TcpClientSocket::send( const_byte_span buffer ) noexcept
 	return SocketError::Success;
 }
 
-SocketError TcpClientSocket::receive( byte_span buffer, size_t & totalReceived ) noexcept
+SocketError TcpSocket::receive( byte_span buffer, size_t & totalReceived ) noexcept
 {
 	if (_socket == INVALID_SOCK)
 	{
@@ -544,11 +544,11 @@ SocketError TcpServerSocket::open( uint16_t port ) noexcept
 	return SocketError::Success;
 }
 
-TcpClientSocket TcpServerSocket::accept() noexcept
+TcpSocket TcpServerSocket::accept() noexcept
 {
 	if (_socket == INVALID_SOCK)
 	{
-		return TcpClientSocket();
+		return TcpSocket();
 	}
 
 	// TODO: pass addr to the user
@@ -559,11 +559,11 @@ TcpClientSocket TcpServerSocket::accept() noexcept
 	if (clientSocket == INVALID_SOCK)
 	{
 		_lastSystemError = getLastError();
-		return TcpClientSocket();
+		return TcpSocket();
 	}
 
 	_lastSystemError = getLastError();
-	return TcpClientSocket( clientSocket );
+	return TcpSocket( clientSocket );
 }
 
 
