@@ -152,14 +152,14 @@ class TcpClientSocket : public impl::SocketCommon
 	/** If the requested amount of data don't arrive all at once,
 	  * it repeats the system calls until all requested data are received.
 	  * The number of bytes actually received is stored in an output parameter.
-	  * @param[out] received how many bytes were really received */
+	  * \param[out] received how many bytes were really received */
 	SocketError receive( byte_span buffer, size_t & received ) noexcept;
 
 	/// Receive the given number of bytes from the socket.
 	/** If the requested amount of data don't arrive all at once,
 	  * it repeats the system calls until all requested data are received.
 	  * After the call, the size of the vector will be equal to the number of bytes actually received.
-	  * @param[in] size how many bytes to receive */
+	  * \param[in] size how many bytes to receive */
 	SocketError receive( std::vector< uint8_t > & buffer, size_t size ) noexcept
 	{
 		buffer.resize( size );  // allocate the needed storage
