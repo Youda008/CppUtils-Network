@@ -79,7 +79,7 @@ class BinaryOutputStream
 	void writeIntLE( IntType native )
 	{
 		checkWrite( sizeof(native), "int" );
-		_writeIntBE( native );
+		_writeIntLE( native );
 	}
 
 	/// Converts an integer representation of an enum value from native format to big endian and writes it into the buffer.
