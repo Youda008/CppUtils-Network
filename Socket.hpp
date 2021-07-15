@@ -148,6 +148,13 @@ class TcpSocket : public impl::SocketCommon
 	  * it repeats the system calls until all requested data are sent. */
 	SocketError send( const_byte_span buffer ) noexcept;
 
+	/// Convenience wrapper of send( const_byte_span ) for sending textual data.
+	/** \param[in] message null-terminated buffer of chars */
+	SocketError send( const char * message )
+	{
+		return send( const_char_span( message, strlen(message) ).toBytes() );
+	}
+
 	/// Receive the given number of bytes from the socket.
 	/** If the requested amount of data don't arrive all at once,
 	  * it repeats the system calls until all requested data are received.
@@ -227,6 +234,13 @@ class UdpSocket : public impl::SocketCommon
 
 	/// Sends a datagram to a specified address and port.
 	SocketError sendTo( const Endpoint & endpoint, const_byte_span buffer );
+
+	/// Convenience wrapper of sendTo( const Endpoint &, const_byte_span ) for sending textual data.
+	/** \param[in] message null-terminated buffer of chars */
+	SocketError sendTo( const Endpoint & endpoint, const char * message )
+	{
+		return sendTo( endpoint, const_char_span( message, strlen(message) ).toBytes() );
+	}
 
 	/// Waits for an incomming datagram and returns the packet data and the address and port it came from.
 	SocketError recvFrom( Endpoint & endpoint, byte_span buffer, size_t & received );
