@@ -14,8 +14,8 @@
 	#include <winsock2.h>      // socket, closesocket
 	#include <ws2tcpip.h>      // addrinfo
 
-	using in_addr_t = unsigned long;  // windows does not use in_addr_t, it uses unsigned long instead
-	using socklen_t = int;
+	using in_addr_t = unsigned long;  // linux has in_addr_t, windows has unsigned long
+	using socklen_t = int;            // linux has socklen_t, windows has int
 
 	constexpr own::socket_t INVALID_SOCK = INVALID_SOCKET;
 	constexpr own::system_error_t SUCCESS = ERROR_SUCCESS;
@@ -28,7 +28,7 @@
 	#include <arpa/inet.h>     // inet_addr, inet_ntoa
 
 	constexpr own::socket_t INVALID_SOCK = -1;
-	constexpr system_error_t SUCCESS = 0;
+	constexpr own::system_error_t SUCCESS = 0;
 #endif // _WIN32
 
 #include <mutex>
@@ -646,7 +646,7 @@ SocketError UdpSocket::sendTo( const Endpoint & endpoint, const_byte_span buffer
 
 SocketError UdpSocket::recvFrom( Endpoint & endpoint, byte_span buffer, size_t & totalReceived )
 {
-	struct sockaddr_storage saddr; int addrlen;
+	struct sockaddr_storage saddr; socklen_t addrlen;
 	memset( &saddr, 0, sizeof(saddr) );
 	addrlen = sizeof(saddr);
 

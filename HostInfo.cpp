@@ -11,10 +11,12 @@
 
 #include "CriticalError.hpp"
 
+#include <cstring>  // memset
+
 #ifdef _WIN32
 	#include <ws2tcpip.h>
 #else
-	#include <arpa/inet.h>
+	#include <netdb.h>
 #endif
 
 
