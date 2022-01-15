@@ -437,6 +437,7 @@ class BinaryInputStream
 //  this allows you to use operator << and >> for integers and enums without losing the choice between little/big endian
 
 #define MAKE_LITTLE_ENDIAN_DEFAULT \
+namespace own {\
 	template< typename IntType, typename std::enable_if< std::is_integral<IntType>::value, int >::type = 0 > \
 	inline own::BinaryOutputStream & operator<<( own::BinaryOutputStream & stream, IntType val ) \
 	{\
@@ -460,9 +461,14 @@ class BinaryInputStream
 	{\
 		stream.readEnumLE( val ); \
 		return stream; \
-	}
+	}\
+}\
+using own::operator<<;\
+using own::operator>>;
+
 
 #define MAKE_BIG_ENDIAN_DEFAULT \
+namespace own {\
 	template< typename IntType, typename std::enable_if< std::is_integral<IntType>::value, int >::type = 0 > \
 	inline own::BinaryOutputStream & operator<<( own::BinaryOutputStream & stream, IntType val ) \
 	{\
@@ -486,7 +492,10 @@ class BinaryInputStream
 	{\
 		stream.readEnumBE( val ); \
 		return stream; \
-	}
+	}\
+}\
+using own::operator<<;\
+using own::operator>>;
 
 
 //======================================================================================================================
