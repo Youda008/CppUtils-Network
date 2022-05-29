@@ -31,7 +31,7 @@ namespace own {
 //======================================================================================================================
 /// private implementation details
 
-namespace impl {
+namespace priv {
 
 	void genericCopy( const uint8_t * src, uint8_t * dst, size_t size ) noexcept;
 	inline void fastCopy4( const uint8_t * src, uint8_t * dst ) noexcept
@@ -103,39 +103,39 @@ class GenericAddr
 
 	GenericAddr( std::initializer_list< uint8_t > initList )
 	{
-		impl::copyFromDynamic( _data, Size, &*initList.begin(), initList.size() );
+		priv::copyFromDynamic( _data, Size, &*initList.begin(), initList.size() );
 	}
 	GenericAddr( const_byte_span data )
 	{
-		impl::copyFromDynamic( _data, Size, data.data(), data.size() );
+		priv::copyFromDynamic( _data, Size, data.data(), data.size() );
 	}
 	GenericAddr( fixed_const_byte_span< Size > data ) noexcept
 	{
-		impl::genericCopy( data.data(), _data, Size );
+		priv::genericCopy( data.data(), _data, Size );
 	}
 	GenericAddr( const GenericAddr< Size > & other ) noexcept
 	{
-		impl::genericCopy( other._data, _data, Size );
+		priv::genericCopy( other._data, _data, Size );
 	}
 
 	GenericAddr< Size > & operator=( std::initializer_list< uint8_t > initList )
 	{
-		impl::copyFromDynamic( _data, Size, &*initList.begin(), initList.size() );
+		priv::copyFromDynamic( _data, Size, &*initList.begin(), initList.size() );
 		return *this;
 	}
 	GenericAddr< Size > & operator=( const_byte_span data )
 	{
-		impl::copyFromDynamic( _data, Size, data.data(), data.size() );
+		priv::copyFromDynamic( _data, Size, data.data(), data.size() );
 		return *this;
 	}
 	GenericAddr< Size > & operator=( fixed_const_byte_span< Size > data ) noexcept
 	{
-		impl::genericCopy( data.data(), _data, Size );
+		priv::genericCopy( data.data(), _data, Size );
 		return *this;
 	}
 	GenericAddr< Size > & operator=( const GenericAddr< Size > & other ) noexcept
 	{
-		impl::genericCopy( other._data, _data, Size );
+		priv::genericCopy( other._data, _data, Size );
 		return *this;
 	}
 
@@ -147,15 +147,15 @@ class GenericAddr
 
 	bool operator==( const GenericAddr< Size > & other ) const noexcept
 	{
-		return impl::genericCompare( _data, other._data ) == 0;
+		return priv::genericCompare( _data, other._data ) == 0;
 	}
 	bool operator< ( const GenericAddr< Size > & other ) const noexcept
 	{
-		return impl::genericCompare( _data, other._data ) < 0;
+		return priv::genericCompare( _data, other._data ) < 0;
 	}
 	bool operator> ( const GenericAddr< Size > & other ) const noexcept
 	{
-		return impl::genericCompare( _data, other._data ) > 0;
+		return priv::genericCompare( _data, other._data ) > 0;
 	}
 
 };
@@ -184,39 +184,39 @@ class IPv4Addr : public GenericAddr<4>
 
 	IPv4Addr( std::initializer_list< uint8_t > initList )
 	{
-		impl::copy4FromDynamic( _data, &*initList.begin(), initList.size() );
+		priv::copy4FromDynamic( _data, &*initList.begin(), initList.size() );
 	}
 	IPv4Addr( const_byte_span data )
 	{
-		impl::copy4FromDynamic( _data, data.data(), data.size() );
+		priv::copy4FromDynamic( _data, data.data(), data.size() );
 	}
 	IPv4Addr( fixed_const_byte_span<4> data ) noexcept
 	{
-		impl::fastCopy4( data.data(), _data );
+		priv::fastCopy4( data.data(), _data );
 	}
 	IPv4Addr( const IPv4Addr & other ) noexcept : GenericAddr<4>()
 	{
-		impl::fastCopy4( other.data().data(), _data );
+		priv::fastCopy4( other.data().data(), _data );
 	}
 
 	IPv4Addr & operator=( std::initializer_list< uint8_t > initList )
 	{
-		impl::copy4FromDynamic( _data, &*initList.begin(), initList.size() );
+		priv::copy4FromDynamic( _data, &*initList.begin(), initList.size() );
 		return *this;
 	}
 	IPv4Addr & operator=( const_byte_span data )
 	{
-		impl::copy4FromDynamic( _data, data.data(), data.size() );
+		priv::copy4FromDynamic( _data, data.data(), data.size() );
 		return *this;
 	}
 	IPv4Addr & operator=( fixed_const_byte_span<4> data ) noexcept
 	{
-		impl::fastCopy4( data.data(), _data );
+		priv::fastCopy4( data.data(), _data );
 		return *this;
 	}
 	IPv4Addr & operator=( const IPv4Addr & other ) noexcept
 	{
-		impl::fastCopy4( other.data().data(), _data );
+		priv::fastCopy4( other.data().data(), _data );
 		return *this;
 	}
 
@@ -236,39 +236,39 @@ class IPv6Addr : public GenericAddr<16>
 
 	IPv6Addr( std::initializer_list< uint8_t > initList )
 	{
-		impl::copy16FromDynamic( _data, &*initList.begin(), initList.size() );
+		priv::copy16FromDynamic( _data, &*initList.begin(), initList.size() );
 	}
 	IPv6Addr( const_byte_span data )
 	{
-		impl::copy16FromDynamic( _data, data.data(), data.size() );
+		priv::copy16FromDynamic( _data, data.data(), data.size() );
 	}
 	IPv6Addr( fixed_const_byte_span<4> data ) noexcept
 	{
-		impl::fastCopy16( data.data(), _data );
+		priv::fastCopy16( data.data(), _data );
 	}
 	IPv6Addr( const IPv6Addr & other ) noexcept : GenericAddr<16>()
 	{
-		impl::fastCopy16( other.data().data(), _data );
+		priv::fastCopy16( other.data().data(), _data );
 	}
 
 	IPv6Addr & operator=( std::initializer_list< uint8_t > initList )
 	{
-		impl::copy16FromDynamic( _data, &*initList.begin(), initList.size() );
+		priv::copy16FromDynamic( _data, &*initList.begin(), initList.size() );
 		return *this;
 	}
 	IPv6Addr & operator=( const_byte_span data )
 	{
-		impl::copy16FromDynamic( _data, data.data(), data.size() );
+		priv::copy16FromDynamic( _data, data.data(), data.size() );
 		return *this;
 	}
 	IPv6Addr & operator=( fixed_const_byte_span<4> data ) noexcept
 	{
-		impl::fastCopy16( data.data(), _data );
+		priv::fastCopy16( data.data(), _data );
 		return *this;
 	}
 	IPv6Addr & operator=( const IPv6Addr & other ) noexcept
 	{
-		impl::fastCopy16( other.data().data(), _data );
+		priv::fastCopy16( other.data().data(), _data );
 		return *this;
 	}
 
@@ -293,22 +293,22 @@ class IPAddr : public GenericAddr<16>
 
 	IPAddr( fixed_const_byte_span<4> data ) noexcept
 	{
-		impl::fastCopy4( data.data(), _data );
+		priv::fastCopy4( data.data(), _data );
 		_version = IPVer::_4;
 	}
 	IPAddr( fixed_const_byte_span<16> data ) noexcept
 	{
-		impl::fastCopy16( data.data(), _data );
+		priv::fastCopy16( data.data(), _data );
 		_version = IPVer::_6;
 	}
 	IPAddr( const IPv4Addr & addr ) noexcept
 	{
-		impl::fastCopy4( addr._data, _data );
+		priv::fastCopy4( addr._data, _data );
 		_version = IPVer::_4;
 	}
 	IPAddr( const IPv6Addr & addr ) noexcept
 	{
-		impl::fastCopy16( addr._data, _data );
+		priv::fastCopy16( addr._data, _data );
 		_version = IPVer::_6;
 	}
 

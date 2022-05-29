@@ -132,42 +132,32 @@ static NetworkingSubsystem g_netSystem;  // this will get initialized on first u
 
 
 //======================================================================================================================
-//  SocketCommon
+//  SocketBase
 
-namespace impl {
+namespace priv {
 
-SocketCommon::SocketCommon() noexcept
+SocketBase::SocketBase() noexcept
 :
 	_socket( INVALID_SOCK ),
 	_lastSystemError( SUCCESS ),
 	_isBlocking( true )
 {}
 
-SocketCommon::SocketCommon( socket_t sock ) noexcept
+SocketBase::SocketBase( socket_t sock ) noexcept
 :
 	_socket( sock ),
 	_lastSystemError( SUCCESS ),
 	_isBlocking( true )
 {}
 
-SocketCommon::~SocketCommon() noexcept
-{
-	if (_socket == INVALID_SOCK)
-	{
-		return;
-	}
+SocketBase::~SocketBase() noexcept {}
 
-	_shutdownSocket( _socket );
-
-	_closeSocket( _socket );
-}
-
-SocketCommon::SocketCommon( SocketCommon && other ) noexcept
+SocketBase::SocketBase( SocketBase && other ) noexcept
 {
 	*this = move( other );
 }
 
-SocketCommon & SocketCommon::operator=( SocketCommon && other ) noexcept
+SocketBase & SocketBase::operator=( SocketBase && other ) noexcept
 {
 	_socket = other._socket;
 	_lastSystemError = other._lastSystemError;
@@ -179,38 +169,7 @@ SocketCommon & SocketCommon::operator=( SocketCommon && other ) noexcept
 	return *this;
 }
 
-SocketError SocketCommon::close() noexcept
-{
-	if (_socket == INVALID_SOCK)
-	{
-		return SocketError::NotConnected;
-	}
-
-	if (!_shutdownSocket( _socket ))
-	{
-		_lastSystemError = getLastError();
-		_socket = INVALID_SOCK;
-		return SocketError::Other;
-	}
-
-	if (!_closeSocket( _socket ))
-	{
-		_lastSystemError = getLastError();
-		_socket = INVALID_SOCK;
-		return SocketError::Other;
-	}
-
-	_lastSystemError = getLastError();
-	_socket = INVALID_SOCK;
-	return SocketError::Success;
-}
-
-bool SocketCommon::isOpen() const noexcept
-{
-	return _socket != INVALID_SOCK;
-}
-
-bool SocketCommon::setBlockingMode( bool enable ) noexcept
+bool SocketBase::setBlockingMode( bool enable ) noexcept
 {
 	bool success = _setBlockingMode( _socket, enable );
 	if (success)
@@ -220,7 +179,7 @@ bool SocketCommon::setBlockingMode( bool enable ) noexcept
 	return success;
 }
 
-bool SocketCommon::_shutdownSocket( socket_t sock ) noexcept
+bool SocketBase::_shutdownSocket( socket_t sock ) noexcept
 {
  #ifdef _WIN32
 	return ::shutdown( sock, SD_BOTH ) == 0;
@@ -229,7 +188,7 @@ bool SocketCommon::_shutdownSocket( socket_t sock ) noexcept
  #endif // _WIN32
 }
 
-bool SocketCommon::_closeSocket( socket_t sock ) noexcept
+bool SocketBase::_closeSocket( socket_t sock ) noexcept
 {
  #ifdef _WIN32
 	return ::closesocket( sock ) == 0;
@@ -238,7 +197,7 @@ bool SocketCommon::_closeSocket( socket_t sock ) noexcept
  #endif // _WIN32
 }
 
-bool SocketCommon::_setTimeout( socket_t sock, std::chrono::milliseconds timeout_ms ) noexcept
+bool SocketBase::_setTimeout( socket_t sock, std::chrono::milliseconds timeout_ms ) noexcept
 {
  #ifdef _WIN32
 	DWORD timeout = (DWORD)timeout_ms.count();
@@ -251,7 +210,7 @@ bool SocketCommon::_setTimeout( socket_t sock, std::chrono::milliseconds timeout
 	return ::setsockopt( sock, SOL_SOCKET, SO_RCVTIMEO, (char *)&timeout, sizeof(timeout) ) == 0;
 }
 
-bool SocketCommon::_isTimeout( system_error_t errorCode ) noexcept
+bool SocketBase::_isTimeout( system_error_t errorCode ) noexcept
 {
  #ifdef _WIN32
 	return errorCode == WSAETIMEDOUT;
@@ -260,7 +219,7 @@ bool SocketCommon::_isTimeout( system_error_t errorCode ) noexcept
  #endif // _WIN32
 }
 
-bool SocketCommon::_isWouldBlock( system_error_t errorCode ) noexcept
+bool SocketBase::_isWouldBlock( system_error_t errorCode ) noexcept
 {
  #ifdef _WIN32
 	return errorCode == WSAEWOULDBLOCK;
@@ -269,7 +228,7 @@ bool SocketCommon::_isWouldBlock( system_error_t errorCode ) noexcept
  #endif // _WIN32
 }
 
-bool SocketCommon::_setBlockingMode( socket_t sock, bool enable ) noexcept
+bool SocketBase::_setBlockingMode( socket_t sock, bool enable ) noexcept
 {
 #ifdef _WIN32
 	unsigned long mode = enable ? 0 : 1;
@@ -288,15 +247,18 @@ bool SocketCommon::_setBlockingMode( socket_t sock, bool enable ) noexcept
 #endif
 }
 
-} // namespace impl
+} // namespace priv
 
 
 //======================================================================================================================
 //  TcpSocket
 
-TcpSocket::TcpSocket() noexcept : impl::SocketCommon() {}
+TcpSocket::TcpSocket() noexcept : priv::SocketBase() {}
 
-TcpSocket::~TcpSocket() noexcept {}  // delegate to SocketCommon
+TcpSocket::~TcpSocket() noexcept
+{
+	disconnect();
+}
 
 TcpSocket::TcpSocket( TcpSocket && other ) noexcept
 {
@@ -305,7 +267,8 @@ TcpSocket::TcpSocket( TcpSocket && other ) noexcept
 
 TcpSocket & TcpSocket::operator=( TcpSocket && other ) noexcept
 {
-	return static_cast< TcpSocket & >( impl::SocketCommon::operator=( move( other ) ) );
+	priv::SocketBase::operator=( move( other ) );
+	return *this;
 }
 
 SocketError TcpSocket::connect( const std::string & host, uint16_t port ) noexcept
@@ -365,6 +328,8 @@ SocketError TcpSocket::connect( const IPAddr & addr, uint16_t port ) noexcept
 SocketError TcpSocket::_connect( int family, int addrlen, struct sockaddr * addr ) noexcept
 {
 	// create a corresponding socket
+	// The Winsock2 sockets are not reusable (after calling shutdown(), a new socket has to be created),
+	// so it's pointless to split this into socket creation (in constructor) and socket connection (here).
 	_socket = ::socket( family, SOCK_STREAM, 0 );
 	if (_socket == INVALID_SOCK)
 	{
@@ -386,15 +351,32 @@ SocketError TcpSocket::_connect( int family, int addrlen, struct sockaddr * addr
 
 SocketError TcpSocket::disconnect() noexcept
 {
-	return impl::SocketCommon::close();
+	if (!isConnected())
+	{
+		return SocketError::NotConnected;
+	}
+
+	if (!_shutdownSocket( _socket ))
+	{
+		critical_error( "shutdown(socket) should not fail, please investigate, error code = %d", getLastError() );
+	}
+
+	if (!_closeSocket( _socket ))
+	{
+		critical_error( "close(socket) should not fail, please investigate, error code = %d", getLastError() );
+	}
+
+	_lastSystemError = getLastError();
+	_socket = INVALID_SOCK;
+	return SocketError::Success;
 }
 
 bool TcpSocket::isConnected() const noexcept
 {
-	return impl::SocketCommon::isOpen();
+	return _socket != INVALID_SOCK;
 }
 
-bool TcpSocket::isValid() const noexcept
+bool TcpSocket::isAccepted() const noexcept
 {
 	return _socket != INVALID_SOCK;
 }
@@ -430,6 +412,9 @@ SocketError TcpSocket::send( const_byte_span buffer ) noexcept
 	_lastSystemError = getLastError();
 	return SocketError::Success;
 }
+
+// TODO: Add support for proper cancellation of blocking recv from another thread.
+//       Calling close/disconnect from another thread is a hack and only works by accident.
 
 SocketError TcpSocket::receive( byte_span buffer, size_t & totalReceived ) noexcept
 {
@@ -479,9 +464,12 @@ SocketError TcpSocket::receive( byte_span buffer, size_t & totalReceived ) noexc
 //======================================================================================================================
 //  TcpServerSocket
 
-TcpServerSocket::TcpServerSocket() noexcept : impl::SocketCommon() {}
+TcpServerSocket::TcpServerSocket() noexcept : priv::SocketBase() {}
 
-TcpServerSocket::~TcpServerSocket() noexcept {}  // delegate to SocketCommon
+TcpServerSocket::~TcpServerSocket() noexcept
+{
+	close();
+}
 
 TcpServerSocket::TcpServerSocket( TcpServerSocket && other ) noexcept
 {
@@ -490,7 +478,7 @@ TcpServerSocket::TcpServerSocket( TcpServerSocket && other ) noexcept
 
 TcpServerSocket & TcpServerSocket::operator=( TcpServerSocket && other ) noexcept
 {
-	return static_cast< TcpServerSocket & >( impl::SocketCommon::operator=( move( other ) ) );
+	return static_cast< TcpServerSocket & >( priv::SocketBase::operator=( move( other ) ) );
 }
 
 SocketError TcpServerSocket::open( uint16_t port ) noexcept
@@ -544,9 +532,31 @@ SocketError TcpServerSocket::open( uint16_t port ) noexcept
 	return SocketError::Success;
 }
 
+SocketError TcpServerSocket::close() noexcept
+{
+	if (!isOpen())
+	{
+		return SocketError::NotOpen;
+	}
+
+	if (!_closeSocket( _socket ))
+	{
+		critical_error( "close(socket) should not fail, please investigate, error code = %d", getLastError() );
+	}
+
+	_lastSystemError = getLastError();
+	_socket = INVALID_SOCK;
+	return SocketError::Success;
+}
+
+bool TcpServerSocket::isOpen() const noexcept
+{
+	return _socket != INVALID_SOCK;
+}
+
 TcpSocket TcpServerSocket::accept() noexcept
 {
-	if (_socket == INVALID_SOCK)
+	if (!isOpen())
 	{
 		return TcpSocket();
 	}
@@ -570,9 +580,9 @@ TcpSocket TcpServerSocket::accept() noexcept
 //======================================================================================================================
 //  UdpSocket
 
-UdpSocket::UdpSocket() noexcept : impl::SocketCommon() {}
+UdpSocket::UdpSocket() noexcept : priv::SocketBase() {}
 
-UdpSocket::~UdpSocket() noexcept {}  // delegate to SocketCommon
+UdpSocket::~UdpSocket() noexcept {}  // delegate to SocketBase
 
 UdpSocket::UdpSocket( UdpSocket && other ) noexcept
 {
@@ -581,7 +591,7 @@ UdpSocket::UdpSocket( UdpSocket && other ) noexcept
 
 UdpSocket & UdpSocket::operator=( UdpSocket && other ) noexcept
 {
-	return static_cast< UdpSocket & >( impl::SocketCommon::operator=( move( other ) ) );
+	return static_cast< UdpSocket & >( priv::SocketBase::operator=( move( other ) ) );
 }
 
 SocketError UdpSocket::open( uint16_t port ) noexcept
@@ -626,6 +636,33 @@ SocketError UdpSocket::open( uint16_t port ) noexcept
 
 	_lastSystemError = getLastError();
 	return SocketError::Success;
+}
+
+SocketError UdpSocket::close() noexcept
+{
+	if (!isOpen())
+	{
+		return SocketError::NotOpen;
+	}
+
+	if (!_shutdownSocket( _socket ))
+	{
+		critical_error( "shutdown(socket) should not fail, please investigate, error code = %d", getLastError() );
+	}
+
+	if (!_closeSocket( _socket ))
+	{
+		critical_error( "close(socket) should not fail, please investigate, error code = %d", getLastError() );
+	}
+
+	_lastSystemError = getLastError();
+	_socket = INVALID_SOCK;
+	return SocketError::Success;
+}
+
+bool UdpSocket::isOpen() const noexcept
+{
+	return _socket != INVALID_SOCK;
 }
 
 SocketError UdpSocket::sendTo( const Endpoint & endpoint, const_byte_span buffer )

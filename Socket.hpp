@@ -32,7 +32,7 @@ enum class SocketError
 	Success = 0,                ///< The operation was successful.
 	// our own error states that don't have anything to do with the system sockets
 	AlreadyConnected = 1,       ///< Connect operation failed because the socket is already connected. Call disconnect() first.
-	NotConnected = 2,           ///< Operation failed because the socket is not connected. Call connect(...) first.
+	NotConnected = 2,           ///< Operation failed because the socket is not connected. Call connect() first.
 	// errors related to connect attempt
 	NetworkingInitFailed = 10,  ///< Operation failed because underlying networking system could not be initialized. Call getLastSystemError() for more info.
 	HostNotResolved = 11,       ///< The hostname you entered could not be resolved to IP address. Call getLastSystemError() for more info.
@@ -45,8 +45,9 @@ enum class SocketError
 	WouldBlock = 32,            ///< Socket is set to non-blocking mode and there is no data in the system input buffer.
 	// errors related to opening a server
 	AlreadyOpen = 40,           ///< Opening server failed because the socket is already listening. Call close() first.
-	BindFailed = 41,            ///< Failed to bind the socket to a specified network address and port. Call getLastSystemError() for more info.
-	ListenFailed = 42,          ///< Failed to switch the socket to a listening state. Call getLastSystemError() for more info.
+	NotOpen = 41,               ///< Operation failed because the socket has not been opened. Call open() first.
+	BindFailed = 42,            ///< Failed to bind the socket to a specified network address and port. Call getLastSystemError() for more info.
+	ListenFailed = 43,          ///< Failed to switch the socket to a listening state. Call getLastSystemError() for more info.
 
 	Other = 255                 ///< Other system error. Call getLastSystemError() for more info.
 };
@@ -62,32 +63,29 @@ const char * enumString( SocketError error ) noexcept;
 //======================================================================================================================
 /// private implementation details
 
-namespace impl {
+namespace priv {
 
 /// common for all socket classes
-class SocketCommon
+class SocketBase
 {
 
  public:
-
-	SocketError close() noexcept;
-	bool isOpen() const noexcept;
 
 	bool setBlockingMode( bool enable ) noexcept;
 	bool isBlocking() const noexcept  { return _isBlocking; }
 
 	system_error_t getLastSystemError() const noexcept  { return _lastSystemError; }
 
- protected:
+ protected: // functions
 
-	SocketCommon() noexcept;
-	SocketCommon( socket_t sock ) noexcept;
-	~SocketCommon() noexcept;
+	SocketBase() noexcept;
+	SocketBase( socket_t sock ) noexcept;
+	~SocketBase() noexcept;
 
-	SocketCommon( const SocketCommon & other ) = delete;
-	SocketCommon( SocketCommon && other ) noexcept;
-	SocketCommon & operator=( const SocketCommon & other ) = delete;
-	SocketCommon & operator=( SocketCommon && other ) noexcept;
+	SocketBase( const SocketBase & other ) = delete;
+	SocketBase( SocketBase && other ) noexcept;
+	SocketBase & operator=( const SocketBase & other ) = delete;
+	SocketBase & operator=( SocketBase && other ) noexcept;
 
 	static bool _shutdownSocket( socket_t sock ) noexcept;
 	static bool _closeSocket( socket_t sock ) noexcept;
@@ -96,7 +94,7 @@ class SocketCommon
 	static bool _isWouldBlock( system_error_t errorCode ) noexcept;
 	static bool _setBlockingMode( socket_t sock, bool enable ) noexcept;
 
- protected:
+ protected: // members
 
 	socket_t _socket;
 	system_error_t _lastSystemError;
@@ -104,7 +102,7 @@ class SocketCommon
 
 };
 
-} // namespace impl
+} // namespace priv
 
 
 //======================================================================================================================
@@ -112,7 +110,7 @@ class SocketCommon
 /** This class is used either by a client connecting to a server
   * or by a server after it accepts a connection from a client. */
 
-class TcpSocket : public impl::SocketCommon
+class TcpSocket : public priv::SocketBase
 {
 
  public:
@@ -137,8 +135,11 @@ class TcpSocket : public impl::SocketCommon
 
 	bool isConnected() const noexcept;
 
-	/// This needs to be checked after TcpServerSocket::accept()
-	bool isValid() const noexcept;
+	/// This needs to be checked after TcpServerSocket::accept().
+	/** False means the server socket has been closed or there was an error accepting the client. */
+	bool isAccepted() const noexcept;
+
+	operator bool() const noexcept { return isAccepted(); }
 
 	/// Sets the timeout for further receive operations.
 	bool setTimeout( std::chrono::milliseconds timeout ) noexcept;
@@ -180,7 +181,7 @@ class TcpSocket : public impl::SocketCommon
 
 	 // allow creating socket object from already initialized socket handle, but only for TcpServerSocket
 	 friend class TcpServerSocket;
-	 TcpSocket( socket_t sock ) noexcept : SocketCommon( sock ) {}
+	 TcpSocket( socket_t sock ) noexcept : SocketBase( sock ) {}
 
 	 SocketError _connect( int family, int addrlen, struct sockaddr * addr ) noexcept;
 
@@ -191,7 +192,7 @@ class TcpSocket : public impl::SocketCommon
 /// Abstraction over low-level TCP server socket system calls.
 /** This class is used by a server to listen to incomming connections. */
 
-class TcpServerSocket : public impl::SocketCommon
+class TcpServerSocket : public priv::SocketBase
 {
 
  public:
@@ -207,7 +208,12 @@ class TcpServerSocket : public impl::SocketCommon
 	/// Opens a TCP server on selected port.
 	SocketError open( uint16_t port ) noexcept;
 
+	SocketError close() noexcept;
+
+	bool isOpen() const noexcept;
+
 	/// Waits for an incomming connection request and then returns a socket representing the established connection.
+	/** If the server is closed by another thread or an error occurs, the returned socket is invalid and isAccepted() returns false. */
 	TcpSocket accept() noexcept;
 
 };
@@ -216,7 +222,7 @@ class TcpServerSocket : public impl::SocketCommon
 //======================================================================================================================
 /// Abstraction over low-level UDP socket system calls.
 
-class UdpSocket : public impl::SocketCommon
+class UdpSocket : public priv::SocketBase
 {
 
  public:
@@ -231,6 +237,10 @@ class UdpSocket : public impl::SocketCommon
 
 	/// Opens an UDP socket on selected port.
 	SocketError open( uint16_t port = 0 ) noexcept;
+
+	SocketError close() noexcept;
+
+	bool isOpen() const noexcept;
 
 	/// Sends a datagram to a specified address and port.
 	SocketError sendTo( const Endpoint & endpoint, const_byte_span buffer );

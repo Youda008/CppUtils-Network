@@ -28,13 +28,13 @@ using own::span;
 namespace own {
 
 
-using namespace impl;
+using namespace priv;
 
 
 //======================================================================================================================
-//  utils impl
+//  private utils
 
-namespace impl {
+namespace priv {
 
 void genericCopy( const uint8_t * src, uint8_t * dst, size_t size ) noexcept
 {
@@ -50,7 +50,7 @@ static std::ostream & ipv4ToStream( std::ostream & os, const uint8_t * bytes )
 {
 	char str [16];
 	struct in_addr addr;
-	impl::ownAddrToSysAddrV4( bytes, &addr );
+	priv::ownAddrToSysAddrV4( bytes, &addr );
 	if (!inet_ntop( AF_INET, &addr, str, sizeof(str) ))
 		critical_error( "Failed to convert IPv4 address to string." );
 	os << str;
@@ -61,7 +61,7 @@ static std::ostream & ipv6ToStream( std::ostream & os, const uint8_t * bytes )
 {
 	char str [40];
 	struct in6_addr addr;
-	impl::ownAddrToSysAddrV6( bytes, &addr );
+	priv::ownAddrToSysAddrV6( bytes, &addr );
 	if (!inet_ntop( AF_INET6, &addr, str, sizeof(str) ))
 		critical_error( "Failed to convert IPv6 address to string." );
 	os << str;
@@ -76,7 +76,7 @@ static std::istream & ipv4FromStream( std::istream & is, uint8_t * bytes ) noexc
 	struct in_addr addr;
 	if (inet_pton( AF_INET, ipStr.c_str(), &addr ) != 1)
 		is.setstate( std::ios::failbit );
-	impl::sysAddrToOwnAddrV4( &addr, bytes );
+	priv::sysAddrToOwnAddrV4( &addr, bytes );
 	return is;
 }
 
@@ -88,7 +88,7 @@ static std::istream & ipv6FromStream( std::istream & is, uint8_t * bytes ) noexc
 	struct in6_addr addr;
 	if (inet_pton( AF_INET, ipStr.c_str(), &bytes ) != 1)
 		is.setstate( std::ios::failbit );
-	impl::sysAddrToOwnAddrV6( &addr, bytes );
+	priv::sysAddrToOwnAddrV6( &addr, bytes );
 	return is;
 }
 
@@ -101,12 +101,12 @@ static IPVer ipAnyFromStream( std::istream & is, uint8_t * bytes ) noexcept
 	struct in6_addr addr6;
 	if (inet_pton( AF_INET, ipStr.c_str(), &addr4 ) == 1)
 	{
-		impl::sysAddrToOwnAddrV4( &addr4, bytes );
+		priv::sysAddrToOwnAddrV4( &addr4, bytes );
 		return IPVer::_4;
 	}
 	else if (inet_pton( AF_INET6, ipStr.c_str(), &addr6 ) == 1)
 	{
-		impl::sysAddrToOwnAddrV6( &addr6, bytes );
+		priv::sysAddrToOwnAddrV6( &addr6, bytes );
 		return IPVer::_6;
 	}
 	else
@@ -116,7 +116,7 @@ static IPVer ipAnyFromStream( std::istream & is, uint8_t * bytes ) noexcept
 	}
 }
 
-} // namespace impl
+} // namespace priv
 
 
 //======================================================================================================================
@@ -124,12 +124,12 @@ static IPVer ipAnyFromStream( std::istream & is, uint8_t * bytes ) noexcept
 
 std::ostream & operator<<( std::ostream & os, IPv4Addr addr )
 {
-	return impl::ipv4ToStream( os, addr.data().data() );
+	return priv::ipv4ToStream( os, addr.data().data() );
 }
 
 std::istream & operator>>( std::istream & is, IPv4Addr & addr ) noexcept
 {
-	return impl::ipv4FromStream( is, addr.data().data() );
+	return priv::ipv4FromStream( is, addr.data().data() );
 }
 
 
@@ -138,12 +138,12 @@ std::istream & operator>>( std::istream & is, IPv4Addr & addr ) noexcept
 
 std::ostream & operator<<( std::ostream & os, const IPv6Addr & addr )
 {
-	return impl::ipv6ToStream( os, addr.data().data() );
+	return priv::ipv6ToStream( os, addr.data().data() );
 }
 
 std::istream & operator>>( std::istream & is, IPv6Addr & addr ) noexcept
 {
-	return impl::ipv6FromStream( is, addr.data().data() );
+	return priv::ipv6FromStream( is, addr.data().data() );
 }
 
 
@@ -154,12 +154,12 @@ IPAddr::IPAddr( std::initializer_list< uint8_t > initList )
 {
 	if (initList.size() == 4)
 	{
-		impl::fastCopy4( initList.begin(), _data );
+		priv::fastCopy4( initList.begin(), _data );
 		_version = IPVer::_4;
 	}
 	else if (initList.size() == 16)
 	{
-		impl::fastCopy16( initList.begin(), _data );
+		priv::fastCopy16( initList.begin(), _data );
 		_version = IPVer::_6;
 	}
 	else
@@ -174,12 +174,12 @@ IPAddr::IPAddr( const_byte_span data )
 {
 	if (data.size() == 4)
 	{
-		impl::fastCopy4( data.data(), _data );
+		priv::fastCopy4( data.data(), _data );
 		_version = IPVer::_4;
 	}
 	else if (data.size() == 16)
 	{
-		impl::fastCopy16( data.data(), _data );
+		priv::fastCopy16( data.data(), _data );
 		_version = IPVer::_6;
 	}
 	else
@@ -193,16 +193,16 @@ IPAddr::IPAddr( const_byte_span data )
 std::ostream & operator<<( std::ostream & os, const IPAddr & addr )
 {
 	if (addr.version() == IPVer::_4)
-		return impl::ipv4ToStream( os, addr.data().data() );
+		return priv::ipv4ToStream( os, addr.data().data() );
 	else if (addr.version() == IPVer::_6)
-		return impl::ipv6ToStream( os, addr.data().data() );
+		return priv::ipv6ToStream( os, addr.data().data() );
 	else
 		critical_error( "Attempted to print uninitialized IPAddr." );
 }
 
 std::istream & operator>>( std::istream & is, IPAddr & addr ) noexcept
 {
-	addr._version = impl::ipAnyFromStream( is, addr.data().data() );
+	addr._version = priv::ipAnyFromStream( is, addr.data().data() );
 	return is;
 }
 
@@ -230,7 +230,7 @@ void endpointToSockaddr( const Endpoint & ep, struct sockaddr * saddr, int & add
 	{
 		auto saddr4 = reinterpret_cast< struct sockaddr_in * >( saddr );
 		saddr4->sin_family = AF_INET;
-		impl::ownAddrToSysAddrV4( ep.addr.data().data(), &saddr4->sin_addr );
+		priv::ownAddrToSysAddrV4( ep.addr.data().data(), &saddr4->sin_addr );
 		saddr4->sin_port = htons( ep.port );
 		addrlen = sizeof(sockaddr_in);
 	}
@@ -238,7 +238,7 @@ void endpointToSockaddr( const Endpoint & ep, struct sockaddr * saddr, int & add
 	{
 		auto saddr6 = reinterpret_cast< struct sockaddr_in6 * >( saddr );
 		saddr6->sin6_family = AF_INET6;
-		impl::ownAddrToSysAddrV6( ep.addr.data().data(), &saddr6->sin6_addr );
+		priv::ownAddrToSysAddrV6( ep.addr.data().data(), &saddr6->sin6_addr );
 		saddr6->sin6_port = htons( ep.port );
 		addrlen = sizeof(sockaddr_in6);
 	}
@@ -253,14 +253,14 @@ bool sockaddrToEndpoint( const struct sockaddr * saddr, Endpoint & ep ) noexcept
 	if (saddr->sa_family == AF_INET)
 	{
 		auto saddr4 = reinterpret_cast< const struct sockaddr_in * >( saddr );
-		impl::sysAddrToOwnAddrV4( &saddr4->sin_addr, ep.addr.data().data() );
+		priv::sysAddrToOwnAddrV4( &saddr4->sin_addr, ep.addr.data().data() );
 		ep.port = ntohs( saddr4->sin_port );
 		return true;
 	}
 	else if (saddr->sa_family == AF_INET6)
 	{
 		auto saddr6 = reinterpret_cast< const struct sockaddr_in6 * >( saddr );
-		impl::sysAddrToOwnAddrV6( &saddr6->sin6_addr, ep.addr.data().data() );
+		priv::sysAddrToOwnAddrV6( &saddr6->sin6_addr, ep.addr.data().data() );
 		ep.port = ntohs( saddr6->sin6_port );
 		return true;
 	}
