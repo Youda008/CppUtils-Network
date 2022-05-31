@@ -15,7 +15,6 @@
 
 #include <chrono>  // timeout
 #include <vector>  // recv
-#include <cstring> // strlen
 
 struct sockaddr;
 
@@ -128,7 +127,7 @@ class TcpSocket : public priv::SocketBase
 	SocketError connect( const std::string & host, uint16_t port ) noexcept;
 
 	/// Connects to a specified endpoint determined by IP address and port.
-	SocketError connect( const IPAddr & addr, uint16_t port ) noexcept;
+	SocketError connect( const IPAddr & addr, uint16_t port );
 
 	/// Disconnects from the currently connected server.
 	SocketError disconnect() noexcept;
@@ -150,11 +149,8 @@ class TcpSocket : public priv::SocketBase
 	SocketError send( const_byte_span buffer ) noexcept;
 
 	/// Convenience wrapper of send( const_byte_span ) for sending textual data.
-	/** \param[in] message null-terminated buffer of chars */
-	SocketError send( const char * message )
-	{
-		return send( const_char_span( message, strlen(message) ).toBytes() );
-	}
+	/** \param[in] message null-terminated array of chars */
+	SocketError send( const char * message ) noexcept;
 
 	/// Receive the given number of bytes from the socket.
 	/** If the requested amount of data don't arrive all at once,
@@ -168,14 +164,7 @@ class TcpSocket : public priv::SocketBase
 	  * it repeats the system calls until all requested data are received.
 	  * After the call, the size of the vector will be equal to the number of bytes actually received.
 	  * \param[in] size how many bytes to receive */
-	SocketError receive( std::vector< uint8_t > & buffer, size_t size ) noexcept
-	{
-		buffer.resize( size );  // allocate the needed storage
-		size_t received;
-		SocketError result = receive( byte_span( buffer.data(), buffer.size() ), received );
-		buffer.resize( received );  // let's return the user a vector only as big as how much we actually received
-		return result;
-	}
+	SocketError receive( std::vector< uint8_t > & buffer, size_t size ) noexcept;
 
  protected:
 
@@ -246,11 +235,8 @@ class UdpSocket : public priv::SocketBase
 	SocketError sendTo( const Endpoint & endpoint, const_byte_span buffer );
 
 	/// Convenience wrapper of sendTo( const Endpoint &, const_byte_span ) for sending textual data.
-	/** \param[in] message null-terminated buffer of chars */
-	SocketError sendTo( const Endpoint & endpoint, const char * message )
-	{
-		return sendTo( endpoint, const_char_span( message, strlen(message) ).toBytes() );
-	}
+	/** \param[in] message null-terminated array of chars */
+	SocketError sendTo( const Endpoint & endpoint, const char * message );
 
 	/// Waits for an incomming datagram and returns the packet data and the address and port it came from.
 	SocketError recvFrom( Endpoint & endpoint, byte_span buffer, size_t & received );

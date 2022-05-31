@@ -9,8 +9,9 @@
 #define CPPUTILS_NETADDRESS_INCLUDED
 
 
-#include "Span.hpp"
+#include "Essential.hpp"
 
+#include "Span.hpp"
 #include "CriticalError.hpp"
 
 #include <iosfwd>
@@ -139,8 +140,8 @@ class GenericAddr
 		return *this;
 	}
 
-	fixed_byte_span< Size >       data()       noexcept  { return fixed_byte_span< Size >( _data ); }
-	fixed_const_byte_span< Size > data() const noexcept  { return fixed_const_byte_span< Size >( _data ); }
+	fixed_byte_span< Size >       data()       noexcept  { return make_fixed_span( _data ) ; }
+	fixed_const_byte_span< Size > data() const noexcept  { return make_fixed_const_span( _data ); }
 
 	      uint8_t & operator[]( size_t idx )        { return _data[ idx ]; }
 	const uint8_t & operator[]( size_t idx ) const  { return _data[ idx ]; }
@@ -318,13 +319,13 @@ class IPAddr : public GenericAddr<16>
 	{
 		if (_version != IPVer::_4)
 			critical_error( "Attempted to convert IPAddr of version %zu to IPv4Addr.", _version );
-		return IPv4Addr( fixed_const_byte_span<4>( _data ) );
+		return IPv4Addr( make_fixed_span( _data ).shorter<4>() );
 	}
 	IPv6Addr v6() const
 	{
 		if (_version != IPVer::_6)
 			critical_error( "Attempted to convert IPAddr of version %zu to IPv6Addr.", _version );
-		return IPv6Addr( fixed_const_byte_span<16>( _data ) );
+		return IPv6Addr( make_fixed_span( _data ) );
 	}
 
 	friend std::ostream & operator<<( std::ostream & os, const IPAddr & addr );
@@ -354,7 +355,7 @@ struct Endpoint
 	uint16_t port;
 };
 
-void endpointToSockaddr( const Endpoint & ep, struct sockaddr * saddr, int & addrlen ) noexcept;
+void endpointToSockaddr( const Endpoint & ep, struct sockaddr * saddr, int & addrlen );
 
 bool sockaddrToEndpoint( const struct sockaddr * saddr, Endpoint & ep ) noexcept;
 

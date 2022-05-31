@@ -7,7 +7,7 @@
 
 #include "Socket.hpp"
 
-#include "LangUtils.hpp"  // scope_guard
+#include "LangUtils.hpp"    // scope_guard
 #include "CriticalError.hpp"
 
 #ifdef _WIN32
@@ -32,6 +32,7 @@
 #endif // _WIN32
 
 #include <mutex>
+#include <cstring>  // memset, strlen
 
 
 namespace own {
@@ -305,7 +306,7 @@ SocketError TcpSocket::connect( const std::string & host, uint16_t port ) noexce
 	return _connect( ainfo->ai_family, (int)ainfo->ai_addrlen, ainfo->ai_addr );
 }
 
-SocketError TcpSocket::connect( const IPAddr & addr, uint16_t port ) noexcept
+SocketError TcpSocket::connect( const IPAddr & addr, uint16_t port )
 {
 	if (_socket != INVALID_SOCK)
 	{
@@ -713,6 +714,29 @@ SocketError UdpSocket::recvFrom( Endpoint & endpoint, byte_span buffer, size_t &
 	totalReceived = size_t( received );
 	_lastSystemError = getLastError();
 	return SocketError::Success;
+}
+
+
+//======================================================================================================================
+//  convenience wrappers
+
+SocketError TcpSocket::send( const char * message ) noexcept
+{
+	return send( make_span( message, strlen(message) ).as_bytes() );
+}
+
+SocketError UdpSocket::sendTo( const Endpoint & endpoint, const char * message )
+{
+	return sendTo( endpoint, make_span( message, strlen(message) ).as_bytes() );
+}
+
+SocketError TcpSocket::receive( std::vector< uint8_t > & buffer, size_t size ) noexcept
+{
+	buffer.resize( size );  // allocate the needed storage
+	size_t received;
+	SocketError result = receive( make_span( buffer ), received );
+	buffer.resize( received );  // let's return the user a vector only as big as how much we actually received
+	return result;
 }
 
 

@@ -223,7 +223,7 @@ std::istream & operator>>( std::istream & /*os*/, MACAddr & /*addr*/ ) noexcept
 //======================================================================================================================
 //  Endpoint utils
 
-void endpointToSockaddr( const Endpoint & ep, struct sockaddr * saddr, int & addrlen ) noexcept
+void endpointToSockaddr( const Endpoint & ep, struct sockaddr * saddr, int & addrlen )
 {
 	memset( saddr, 0, sizeof(*saddr) );
 	if (ep.addr.version() == IPVer::_4)
