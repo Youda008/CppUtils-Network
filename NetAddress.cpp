@@ -253,14 +253,18 @@ bool sockaddrToEndpoint( const struct sockaddr * saddr, Endpoint & ep ) noexcept
 	if (saddr->sa_family == AF_INET)
 	{
 		auto saddr4 = reinterpret_cast< const struct sockaddr_in * >( saddr );
-		priv::sysAddrToOwnAddrV4( &saddr4->sin_addr, ep.addr.data().data() );
+		uint8_t bytes [4];
+		priv::sysAddrToOwnAddrV4( &saddr4->sin_addr, bytes );
+		ep.addr = IPAddr( make_fixed_span( bytes ) );  // TODO: is it possible to get rid of the second copy?
 		ep.port = ntohs( saddr4->sin_port );
 		return true;
 	}
 	else if (saddr->sa_family == AF_INET6)
 	{
 		auto saddr6 = reinterpret_cast< const struct sockaddr_in6 * >( saddr );
-		priv::sysAddrToOwnAddrV6( &saddr6->sin6_addr, ep.addr.data().data() );
+		uint8_t bytes [16];
+		priv::sysAddrToOwnAddrV6( &saddr6->sin6_addr, bytes );
+		ep.addr = IPAddr( make_fixed_span( bytes ) );
 		ep.port = ntohs( saddr6->sin6_port );
 		return true;
 	}
