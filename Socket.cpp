@@ -274,7 +274,7 @@ TcpSocket & TcpSocket::operator=( TcpSocket && other ) noexcept
 
 SocketError TcpSocket::connect( const std::string & host, uint16_t port ) noexcept
 {
-	if (_socket != INVALID_SOCK)
+	if (isConnected())
 	{
 		return SocketError::AlreadyConnected;
 	}
@@ -308,7 +308,7 @@ SocketError TcpSocket::connect( const std::string & host, uint16_t port ) noexce
 
 SocketError TcpSocket::connect( const IPAddr & addr, uint16_t port )
 {
-	if (_socket != INVALID_SOCK)
+	if (isConnected())
 	{
 		return SocketError::AlreadyConnected;
 	}
@@ -391,7 +391,7 @@ bool TcpSocket::setTimeout( std::chrono::milliseconds timeout ) noexcept
 
 SocketError TcpSocket::send( const_byte_span buffer ) noexcept
 {
-	if (_socket == INVALID_SOCK)
+	if (!isConnected())
 	{
 		return SocketError::NotConnected;
 	}
@@ -419,7 +419,7 @@ SocketError TcpSocket::send( const_byte_span buffer ) noexcept
 
 SocketError TcpSocket::receive( byte_span buffer, size_t & totalReceived ) noexcept
 {
-	if (_socket == INVALID_SOCK)
+	if (!isConnected())
 	{
 		return SocketError::NotConnected;
 	}
@@ -459,6 +459,50 @@ SocketError TcpSocket::receive( byte_span buffer, size_t & totalReceived ) noexc
 
 	_lastSystemError = getLastError();
 	totalReceived = buffer.size();
+	return SocketError::Success;
+}
+
+SocketError TcpSocket::receiveOnce( std::vector< uint8_t > & buffer ) noexcept
+{
+	if (!isConnected())
+	{
+		return SocketError::NotConnected;
+	}
+
+	// The maximum size of data we can receive is limited by the maximum size of a TCP packet.
+	// In theory it can be up to 65536, but in reality it won't be bigger than 1500 most of the time.
+	// Some networks support jumbo frames that have up to 9000 bytes, so this should really cover 99%
+	// of the cases while not requiring second dynamic allocation and not using too much stack.
+	uint8_t tempBuffer [10*1024];
+
+	int received = ::recv( _socket, (char *)tempBuffer, (int)sizeof(tempBuffer), 0 );
+	if (received <= 0)
+	{
+		_lastSystemError = getLastError();
+		if (received == 0)
+		{
+			_closeSocket( _socket );  // server closed, so let's close on our side too
+			_socket = INVALID_SOCK;
+			return SocketError::ConnectionClosed;
+		}
+		else if (!_isBlocking && _isWouldBlock( _lastSystemError ))
+		{
+			return SocketError::WouldBlock;
+		}
+		else if (_isTimeout( _lastSystemError ))
+		{
+			return SocketError::Timeout;
+		}
+		else
+		{
+			return SocketError::Other;
+		}
+	}
+
+	buffer.resize( received );
+	buffer.assign( tempBuffer, tempBuffer + received );
+
+	_lastSystemError = getLastError();
 	return SocketError::Success;
 }
 
