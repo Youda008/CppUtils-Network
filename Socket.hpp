@@ -15,6 +15,7 @@
 
 #include <chrono>  // timeout
 #include <vector>  // recv
+#include <unordered_set>  // waitForAny
 
 struct sockaddr;
 
@@ -60,38 +61,34 @@ const char * enumString( SocketError error ) noexcept;
 
 
 //======================================================================================================================
-/// private implementation details
+/// Abstract base class for all sockets
+/** Used for generic operations working on any sockets, like waitForAny(). */
 
-namespace priv {
-
-/// common for all socket classes
-class SocketBase
+class ASocket
 {
 
  public:
 
+	virtual ~ASocket() noexcept = 0;
+
+	/// Returns the native system handle used for the low-level system APIs.
+	socket_t getSystemHandle() const noexcept { return _socket; }
+
 	bool setBlockingMode( bool enable ) noexcept;
 	bool isBlocking() const noexcept  { return _isBlocking; }
 
+	/// Returns the system error code that was recorded the last time an operation on this socket failed.
 	system_error_t getLastSystemError() const noexcept  { return _lastSystemError; }
 
  protected: // functions
 
-	SocketBase() noexcept;
-	SocketBase( socket_t sock ) noexcept;
-	~SocketBase() noexcept;
+	ASocket( socket_t sock ) noexcept;
 
-	SocketBase( const SocketBase & other ) = delete;
-	SocketBase( SocketBase && other ) noexcept;
-	SocketBase & operator=( const SocketBase & other ) = delete;
-	SocketBase & operator=( SocketBase && other ) noexcept;
-
-	static bool _shutdownSocket( socket_t sock ) noexcept;
-	static bool _closeSocket( socket_t sock ) noexcept;
-	static bool _setTimeout( socket_t sock, std::chrono::milliseconds timeout ) noexcept;
-	static bool _isTimeout( system_error_t errorCode ) noexcept;
-	static bool _isWouldBlock( system_error_t errorCode ) noexcept;
-	static bool _setBlockingMode( socket_t sock, bool enable ) noexcept;
+	ASocket() noexcept;
+	ASocket( const ASocket & other ) = delete;
+	ASocket( ASocket && other ) noexcept;
+	ASocket & operator=( const ASocket & other ) = delete;
+	ASocket & operator=( ASocket && other ) noexcept;
 
  protected: // members
 
@@ -101,15 +98,13 @@ class SocketBase
 
 };
 
-} // namespace priv
-
 
 //======================================================================================================================
 /// Abstraction over low-level TCP socket system calls.
 /** This class is used either by a client connecting to a server
   * or by a server after it accepts a connection from a client. */
 
-class TcpSocket : public priv::SocketBase
+class TcpSocket : public ASocket
 {
 
  public:
@@ -175,7 +170,7 @@ class TcpSocket : public priv::SocketBase
 
 	 // allow creating socket object from already initialized socket handle, but only for TcpServerSocket
 	 friend class TcpServerSocket;
-	 TcpSocket( socket_t sock ) noexcept : SocketBase( sock ) {}
+	 TcpSocket( socket_t sock ) noexcept : ASocket( sock ) {}
 
 	 SocketError _connect( int family, int addrlen, struct sockaddr * addr ) noexcept;
 
@@ -186,7 +181,7 @@ class TcpSocket : public priv::SocketBase
 /// Abstraction over low-level TCP server socket system calls.
 /** This class is used by a server to listen to incomming connections. */
 
-class TcpServerSocket : public priv::SocketBase
+class TcpServerSocket : public ASocket
 {
 
  public:
@@ -208,7 +203,7 @@ class TcpServerSocket : public priv::SocketBase
 
 	/// Waits for an incomming connection request and then returns a socket representing the established connection.
 	/** If the server is closed by another thread or an error occurs, the returned socket is invalid and isAccepted() returns false. */
-	TcpSocket accept() noexcept;
+	TcpSocket accept( Endpoint & endpoint );
 
 };
 
@@ -216,7 +211,7 @@ class TcpServerSocket : public priv::SocketBase
 //======================================================================================================================
 /// Abstraction over low-level UDP socket system calls.
 
-class UdpSocket : public priv::SocketBase
+class UdpSocket : public ASocket
 {
 
  public:
@@ -247,6 +242,15 @@ class UdpSocket : public priv::SocketBase
 	SocketError recvFrom( Endpoint & endpoint, byte_span buffer, size_t & received );
 
 };
+
+
+//======================================================================================================================
+//  multi-socket operations
+
+bool waitForAny(
+	const std::unordered_set< ASocket * > & activeSockets, std::vector< ASocket * > & readySockets,
+	std::chrono::milliseconds timeout
+);
 
 
 //======================================================================================================================

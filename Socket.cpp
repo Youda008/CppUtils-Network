@@ -22,6 +22,7 @@
 #else
 	#include <unistd.h>        // open, close, read, write
 	#include <fcntl.h>         // fnctl, O_NONBLOCK
+	#include <sys/select.h>    // select
 	#include <sys/socket.h>    // socket
 	#include <netdb.h>         // getaddrinfo, gethostbyname
 	#include <netinet/in.h>    // sockaddr_in, in_addr, ntoh, hton
@@ -133,54 +134,9 @@ static NetworkingSubsystem g_netSystem;  // this will get initialized on first u
 
 
 //======================================================================================================================
-//  SocketBase
+//  common low-level operations
 
-namespace priv {
-
-SocketBase::SocketBase() noexcept
-:
-	_socket( INVALID_SOCK ),
-	_lastSystemError( SUCCESS ),
-	_isBlocking( true )
-{}
-
-SocketBase::SocketBase( socket_t sock ) noexcept
-:
-	_socket( sock ),
-	_lastSystemError( SUCCESS ),
-	_isBlocking( true )
-{}
-
-SocketBase::~SocketBase() noexcept {}
-
-SocketBase::SocketBase( SocketBase && other ) noexcept
-{
-	*this = move( other );
-}
-
-SocketBase & SocketBase::operator=( SocketBase && other ) noexcept
-{
-	_socket = other._socket;
-	_lastSystemError = other._lastSystemError;
-	_isBlocking = other._isBlocking;
-	other._socket = INVALID_SOCK;
-	other._lastSystemError = 0;
-	other._isBlocking = false;
-
-	return *this;
-}
-
-bool SocketBase::setBlockingMode( bool enable ) noexcept
-{
-	bool success = _setBlockingMode( _socket, enable );
-	if (success)
-		_isBlocking = enable;
-	else
-		_lastSystemError = getLastError();
-	return success;
-}
-
-bool SocketBase::_shutdownSocket( socket_t sock ) noexcept
+static bool _shutdownSocket( socket_t sock ) noexcept
 {
  #ifdef _WIN32
 	return ::shutdown( sock, SD_BOTH ) == 0;
@@ -189,7 +145,7 @@ bool SocketBase::_shutdownSocket( socket_t sock ) noexcept
  #endif // _WIN32
 }
 
-bool SocketBase::_closeSocket( socket_t sock ) noexcept
+static bool _closeSocket( socket_t sock ) noexcept
 {
  #ifdef _WIN32
 	return ::closesocket( sock ) == 0;
@@ -198,20 +154,20 @@ bool SocketBase::_closeSocket( socket_t sock ) noexcept
  #endif // _WIN32
 }
 
-bool SocketBase::_setTimeout( socket_t sock, std::chrono::milliseconds timeout_ms ) noexcept
+static bool _setTimeout( socket_t sock, std::chrono::milliseconds timeout_ms ) noexcept
 {
  #ifdef _WIN32
 	DWORD timeout = (DWORD)timeout_ms.count();
  #else
 	struct timeval timeout;
-	timeout.tv_sec  = timeout_ms.count() / 1000;
-	timeout.tv_usec = (timeout_ms.count() % 1000) * 1000;
+	timeout.tv_sec  = long( timeout_ms.count() / 1000 );
+	timeout.tv_usec = long( timeout_ms.count() % 1000 ) * 1000;
  #endif // _WIN32
 
 	return ::setsockopt( sock, SOL_SOCKET, SO_RCVTIMEO, (char *)&timeout, sizeof(timeout) ) == 0;
 }
 
-bool SocketBase::_isTimeout( system_error_t errorCode ) noexcept
+static bool _isTimeout( system_error_t errorCode ) noexcept
 {
  #ifdef _WIN32
 	return errorCode == WSAETIMEDOUT;
@@ -220,7 +176,7 @@ bool SocketBase::_isTimeout( system_error_t errorCode ) noexcept
  #endif // _WIN32
 }
 
-bool SocketBase::_isWouldBlock( system_error_t errorCode ) noexcept
+static bool _isWouldBlock( system_error_t errorCode ) noexcept
 {
  #ifdef _WIN32
 	return errorCode == WSAEWOULDBLOCK;
@@ -229,7 +185,7 @@ bool SocketBase::_isWouldBlock( system_error_t errorCode ) noexcept
  #endif // _WIN32
 }
 
-bool SocketBase::_setBlockingMode( socket_t sock, bool enable ) noexcept
+static bool _setBlockingMode( socket_t sock, bool enable ) noexcept
 {
 #ifdef _WIN32
 	unsigned long mode = enable ? 0 : 1;
@@ -248,13 +204,58 @@ bool SocketBase::_setBlockingMode( socket_t sock, bool enable ) noexcept
 #endif
 }
 
-} // namespace priv
+
+//======================================================================================================================
+//  ASocket
+
+ASocket::ASocket() noexcept
+:
+	_socket( INVALID_SOCK ),
+	_lastSystemError( SUCCESS ),
+	_isBlocking( true )
+{}
+
+ASocket::ASocket( socket_t sock ) noexcept
+:
+	_socket( sock ),
+	_lastSystemError( SUCCESS ),
+	_isBlocking( true )
+{}
+
+ASocket::~ASocket() noexcept {}
+
+ASocket::ASocket( ASocket && other ) noexcept
+{
+	*this = move( other );
+}
+
+ASocket & ASocket::operator=( ASocket && other ) noexcept
+{
+	_socket = other._socket;
+	_lastSystemError = other._lastSystemError;
+	_isBlocking = other._isBlocking;
+	other._socket = INVALID_SOCK;
+	other._lastSystemError = 0;
+	other._isBlocking = false;
+
+	return *this;
+}
+
+bool ASocket::setBlockingMode( bool enable ) noexcept
+{
+	bool success = _setBlockingMode( _socket, enable );
+	if (success)
+		_isBlocking = enable;
+	else
+		_lastSystemError = getLastError();
+	return success;
+}
 
 
 //======================================================================================================================
 //  TcpSocket
 
-TcpSocket::TcpSocket() noexcept : priv::SocketBase() {}
+TcpSocket::TcpSocket() noexcept : ASocket() {}
 
 TcpSocket::~TcpSocket() noexcept
 {
@@ -268,7 +269,7 @@ TcpSocket::TcpSocket( TcpSocket && other ) noexcept
 
 TcpSocket & TcpSocket::operator=( TcpSocket && other ) noexcept
 {
-	priv::SocketBase::operator=( move( other ) );
+	ASocket::operator=( move( other ) );
 	return *this;
 }
 
@@ -509,7 +510,7 @@ SocketError TcpSocket::receiveOnce( std::vector< uint8_t > & buffer ) noexcept
 //======================================================================================================================
 //  TcpServerSocket
 
-TcpServerSocket::TcpServerSocket() noexcept : priv::SocketBase() {}
+TcpServerSocket::TcpServerSocket() noexcept : ASocket() {}
 
 TcpServerSocket::~TcpServerSocket() noexcept
 {
@@ -523,7 +524,7 @@ TcpServerSocket::TcpServerSocket( TcpServerSocket && other ) noexcept
 
 TcpServerSocket & TcpServerSocket::operator=( TcpServerSocket && other ) noexcept
 {
-	return static_cast< TcpServerSocket & >( priv::SocketBase::operator=( move( other ) ) );
+	return static_cast< TcpServerSocket & >( ASocket::operator=( move( other ) ) );
 }
 
 SocketError TcpServerSocket::open( uint16_t port ) noexcept
@@ -599,14 +600,13 @@ bool TcpServerSocket::isOpen() const noexcept
 	return _socket != INVALID_SOCK;
 }
 
-TcpSocket TcpServerSocket::accept() noexcept
+TcpSocket TcpServerSocket::accept( Endpoint & endpoint )
 {
 	if (!isOpen())
 	{
 		return TcpSocket();
 	}
 
-	// TODO: pass addr to the user
 	struct sockaddr_storage clientAddr;
 	socklen_t claddrSize = sizeof(clientAddr);
 
@@ -617,6 +617,11 @@ TcpSocket TcpServerSocket::accept() noexcept
 		return TcpSocket();
 	}
 
+	if (!sockaddrToEndpoint( (struct sockaddr *)&clientAddr, endpoint ))
+	{
+		critical_error( "Socket operation returned unexpected address family." );
+	}
+
 	_lastSystemError = getLastError();
 	return TcpSocket( clientSocket );
 }
@@ -625,9 +630,9 @@ TcpSocket TcpServerSocket::accept() noexcept
 //======================================================================================================================
 //  UdpSocket
 
-UdpSocket::UdpSocket() noexcept : priv::SocketBase() {}
+UdpSocket::UdpSocket() noexcept : ASocket() {}
 
-UdpSocket::~UdpSocket() noexcept {}  // delegate to SocketBase
+UdpSocket::~UdpSocket() noexcept {}  // delegate to ASocket
 
 UdpSocket::UdpSocket( UdpSocket && other ) noexcept
 {
@@ -636,7 +641,7 @@ UdpSocket::UdpSocket( UdpSocket && other ) noexcept
 
 UdpSocket & UdpSocket::operator=( UdpSocket && other ) noexcept
 {
-	return static_cast< UdpSocket & >( priv::SocketBase::operator=( move( other ) ) );
+	return static_cast< UdpSocket & >( ASocket::operator=( move( other ) ) );
 }
 
 SocketError UdpSocket::open( uint16_t port ) noexcept
@@ -781,6 +786,47 @@ SocketError TcpSocket::receive( std::vector< uint8_t > & buffer, size_t size ) n
 	SocketError result = receive( make_span( buffer ), received );
 	buffer.resize( received );  // let's return the user a vector only as big as how much we actually received
 	return result;
+}
+
+
+//======================================================================================================================
+//  multi-socket operations
+
+// TODO: more detailed error
+bool waitForAny( const std::unordered_set< ASocket * > & activeSockets, std::vector< ASocket * > & readySockets, std::chrono::milliseconds timeout_ms )
+{
+	fd_set fdset;
+	FD_ZERO( &fdset );
+
+	socket_t maxSocketFd = 0;
+	for (ASocket * socket : activeSockets)
+	{
+		socket_t socketFd = socket->getSystemHandle();
+		FD_SET( socketFd, &fdset );
+		if (socketFd > maxSocketFd)
+			maxSocketFd = socketFd;
+	}
+
+	struct timeval timeout;
+	timeout.tv_sec  = long( timeout_ms.count() / 1000 );
+	timeout.tv_usec = long( timeout_ms.count() % 1000 ) * 1000;
+
+	if (::select( int( maxSocketFd ), &fdset, nullptr, nullptr, &timeout ) < 0)
+	{
+		return false;
+	}
+
+	readySockets.reserve( activeSockets.size() );
+	for (ASocket * socket : activeSockets)
+	{
+		socket_t socketFd = socket->getSystemHandle();
+		if (FD_ISSET( socketFd, &fdset ))
+		{
+			readySockets.push_back( socket );
+		}
+	}
+
+	return true;
 }
 
 
