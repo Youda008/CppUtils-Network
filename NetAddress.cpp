@@ -7,9 +7,9 @@
 
 #include "NetAddress.hpp"
 
-#include "Essential.hpp"
+#include <CppUtils-Essential/Essential.hpp>
 
-#include "CriticalError.hpp"
+#include <CppUtils-Essential/CriticalError.hpp>
 using own::span;
 
 #include <cstring>  // memset

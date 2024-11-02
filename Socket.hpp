@@ -11,7 +11,8 @@
 
 #include "SystemErrorInfo.hpp"
 #include "NetAddress.hpp"
-#include "Span.hpp"
+
+#include <CppUtils-Essential/Span.hpp>
 
 #include <chrono>  // timeout
 #include <vector>  // recv

@@ -7,9 +7,9 @@
 
 #include "HostInfo.hpp"
 
-#include "Essential.hpp"
+#include <CppUtils-Essential/Essential.hpp>
 
-#include "CriticalError.hpp"
+#include <CppUtils-Essential/CriticalError.hpp>
 
 #include <cstring>  // memset
 

@@ -9,10 +9,10 @@
 #define CPPUTILS_NETADDRESS_INCLUDED
 
 
-#include "Essential.hpp"
+#include <CppUtils-Essential/Essential.hpp>
 
-#include "Span.hpp"
-#include "CriticalError.hpp"
+#include <CppUtils-Essential/Span.hpp>
+#include <CppUtils-Essential/CriticalError.hpp>
 
 #include <iosfwd>
 #include <initializer_list>

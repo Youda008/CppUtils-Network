@@ -7,8 +7,8 @@
 
 #include "Socket.hpp"
 
-#include "LangUtils.hpp"    // scope_guard
-#include "CriticalError.hpp"
+#include <CppUtils-Essential/LangUtils.hpp>   // scope_guard
+#include <CppUtils-Essential/CriticalError.hpp>
 
 #ifdef _WIN32
 	#include <winsock2.h>      // socket, closesocket
